@@ -11,6 +11,7 @@ const (
 	EnvURL       = "VOGTER_URL"
 	EnvToken     = "VOGTER_TOKEN"
 	EnvTruecolor = "VOGTER_TRUECOLOR"
+	EnvASCII     = "VOGTER_ASCII"
 )
 
 // Home is the user's home directory, or "." when it cannot be determined.

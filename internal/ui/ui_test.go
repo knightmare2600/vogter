@@ -832,3 +832,22 @@ func TestThemeLiveReload(t *testing.T) {
 		t.Errorf("toasts = %+v", m.toasts)
 	}
 }
+
+func TestASCIIFallback(t *testing.T) {
+	for _, keys := range [][]string{{"1"}, {"2"}, {"3"}, {"3", "a"}, {"?"}} {
+		m, _ := newModel(func(context.Context, []string, string, bool) error { return nil })
+		m = live(m)
+		m, _ = press(m, keys...)
+		out := ansiRe.ReplaceAllString(asciiOnly(m.render()), "")
+		for _, r := range out {
+			if r > 0x7e {
+				t.Fatalf("%v: %q left in the output", keys, r)
+			}
+		}
+		for i, l := range strings.Split(out, "\n") {
+			if len([]rune(l)) > 140 {
+				t.Errorf("%v: line %d grew to %d", keys, i, len([]rune(l)))
+			}
+		}
+	}
+}

@@ -6,7 +6,7 @@ LDFLAGS := -s -w -X main.version=$(VERSION)
 BIN     := bin/vogter
 TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 
-.PHONY: all build check fmt vet test race example cross clean
+.PHONY: all build check fmt vet test race example cross dist notices clean
 
 all: check build
 
@@ -41,6 +41,21 @@ cross:
 	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags '$(LDFLAGS)' \
 	    -o dist/vogter-$(VERSION)-$$os-$$arch$$ext ./cmd/vogter || exit 1; \
 	done
+
+# Release archives: binary, licences, README and the launcher entry.
+dist: cross notices
+	@cd dist && for f in vogter-$(VERSION)-*; do \
+	  case $$f in *.tar.gz|*.zip|*.sha256) continue;; esac; \
+	  d=$${f%.exe}; mkdir -p "$$d.pkg"; \
+	  cp "$$f" "$$d.pkg/vogter$${f##$$d}"; \
+	  cp ../README.md ../LICENSE ../NOTICE ../THIRD_PARTY_NOTICES.txt ../packaging/vogter.desktop "$$d.pkg/"; \
+	  tar czf "$$d.tar.gz" --transform "s,^$$d.pkg,$$d," "$$d.pkg"; \
+	  rm -rf "$$d.pkg"; \
+	done
+	cd dist && sha256sum *.tar.gz > SHA256SUMS
+
+notices:
+	tools/notices.sh > THIRD_PARTY_NOTICES.txt
 
 clean:
 	rm -rf bin dist

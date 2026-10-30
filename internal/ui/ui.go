@@ -113,6 +113,8 @@ type Options struct {
 	// and the toasts.
 	Desktop     bool
 	MinSeverity model.Severity
+	// ASCII replaces every Unicode glyph.
+	ASCII bool
 	// Notify and Open reach the desktop.
 	Notify func(title, body string, urgent bool) error
 	Open   func(url string) error
@@ -674,7 +676,11 @@ func (m Model) onAckKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 
 // View renders the screen.
 func (m Model) View() tea.View {
-	v := tea.NewView(m.render())
+	screen := m.render()
+	if m.opts.ASCII {
+		screen = asciiOnly(screen)
+	}
+	v := tea.NewView(screen)
 	v.AltScreen = true
 	v.WindowTitle = "vogter · " + m.opts.Profile
 	return v

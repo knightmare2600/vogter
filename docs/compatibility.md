@@ -62,3 +62,29 @@ notifications with the same urgency.
 | Windows notifications | No Windows build | One toast says they are unsupported; toasts continue |
 | `vogter import` | n/a | Validated copy of a zabterm config, comments kept, mode 0600, never overwrites without `--force` |
 | Late detail for another host or range | Range mismatch shown briefly | Dropped |
+
+## Parity with the audit checklist
+
+Every row of the checklist in `porting-audit.md` §5 is implemented, apart from Z1. There is no `install.sh`
+or Homebrew tap. Release archives hold the binary, licences and a `.desktop` file instead.
+
+## Platform support
+
+| Platform | Built | Run | Status |
+|---|---|---|---|
+| Linux amd64 | yes | yes, against a fixture server | Supported |
+| Linux arm64 | yes | no | Unverified |
+| macOS amd64, arm64 | yes | no | Unverified |
+| Windows amd64 | yes | no | Unverified: notifications are off by design |
+
+`.github/workflows/ci.yml` runs the tests on Linux, macOS and Windows once the repository is on GitHub. It
+has not run yet, and CI does not exercise a real terminal.
+
+## Not verified
+
+- No run against a real Zabbix server. `go test -tags live ./internal/integration` does one, read-only, when
+  given `VOGTER_LIVE_URL` and `VOGTER_LIVE_TOKEN`.
+- Real Zabbix error wording for an expired session or a permission failure. Vogter matches known phrases,
+  so an unknown wording shows as a plain API error, and a session might not re-login until restart.
+- Omarchy 4 support is tested against files in its v4.0.6 format, not on an Omarchy machine.
+- `osascript` argument passing has not run on macOS.

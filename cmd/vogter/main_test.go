@@ -11,6 +11,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/colorprofile"
+
 	"github.com/knightmare2600/vogter/internal/config"
 )
 
@@ -154,5 +156,20 @@ func TestCheckFailures(t *testing.T) {
 	var errb bytes.Buffer
 	if rc := run([]string{"check"}, io.Discard, &errb); rc != 1 || !strings.Contains(errb.String(), "cannot reach the server") {
 		t.Errorf("unreachable: rc=%d %s", rc, errb.String())
+	}
+}
+
+func TestColourOverrides(t *testing.T) {
+	t.Setenv("NO_COLOR", "")
+	t.Setenv(config.EnvTruecolor, "1")
+	if len(colourProfile()) != 1 {
+		t.Error("VOGTER_TRUECOLOR must force a profile")
+	}
+	t.Setenv("NO_COLOR", "1")
+	if colourProfile() != nil {
+		t.Error("NO_COLOR must win")
+	}
+	if p := colorprofile.Env([]string{"NO_COLOR=1", "TERM=xterm-256color", "COLORTERM=truecolor"}); p == colorprofile.TrueColor || p == colorprofile.ANSI256 {
+		t.Errorf("detection ignored NO_COLOR: %v", p)
 	}
 }

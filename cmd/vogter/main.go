@@ -271,7 +271,12 @@ func failAPI(w io.Writer, err error) int {
 	return 1
 }
 
+// colourProfile applies VOGTER_TRUECOLOR. Otherwise Bubble Tea detects the
+// terminal, and that detection honours NO_COLOR, which therefore wins here.
 func colourProfile() []tea.ProgramOption {
+	if os.Getenv("NO_COLOR") != "" {
+		return nil
+	}
 	switch os.Getenv(config.EnvTruecolor) {
 	case "1":
 		return []tea.ProgramOption{tea.WithColorProfile(colorprofile.TrueColor)}

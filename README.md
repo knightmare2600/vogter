@@ -5,8 +5,8 @@ A keyboard-driven terminal UI for Zabbix, written in Go.
 Vogter is an independent port of [zabterm](https://github.com/enderkus/zabterm) by Ender KUŞ. It is not
 affiliated with, or endorsed by, the zabterm author. See `NOTICE` and `LICENSE`.
 
-**Status: Milestone 5 of 6.** Every zabterm feature is ported. Only Linux has been run so far, and only
-against a fixture server: see `docs/compatibility.md`.
+**Status:** every zabterm feature is ported. It has been run on Linux against a fixture server, not yet
+against a real Zabbix or on macOS or Windows. See "Not verified" in `docs/compatibility.md`.
 
 ## Build
 
@@ -15,6 +15,7 @@ Go 1.26 or newer is required.
 ```sh
 make            # gofmt check, go vet, go test -race, then build bin/vogter
 make cross      # dist/ binaries for linux, darwin and windows
+make dist       # release archives with licences and SHA256SUMS
 ```
 
 ## Use
@@ -38,6 +39,15 @@ Options: `-p NAME` picks a profile, `-c PATH` uses another config file, `-t THEM
 
 Credentials are tried in this order: `VOGTER_TOKEN`, `token_env`, `token_cmd`, `token`, then
 `username`/`password`.
+
+## Environment
+
+| Variable | Effect |
+|---|---|
+| `VOGTER_URL`, `VOGTER_TOKEN` | Run without a config file; the token overrides the active profile |
+| `VOGTER_TRUECOLOR` | `1` forces 24-bit colour, `0` forces 256 colours |
+| `VOGTER_ASCII` | `1` uses only ASCII glyphs |
+| `NO_COLOR` | Turns colour off, and beats `VOGTER_TRUECOLOR` |
 
 ## Zabbix versions
 
