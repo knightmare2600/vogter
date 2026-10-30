@@ -19,7 +19,14 @@ keys + +; sleep 0.3; snap sev; keys - -
 keys h; sleep 0.3; snap hide; keys h
 keys k; keys a; sleep 0.4; snap ack
 keys l o o k; keys Enter; sleep 0.8; snap acked
-keys '?'; sleep 0.4; snap help; keys Escape
+keys '?'; sleep 0.4; snap help; keys Escape; sleep 0.3
+keys 2; sleep 0.3; keys g j Enter; sleep 0.8; snap host
+keys ]; sleep 0.6; snap host6h
+keys ] ]; sleep 0.8; snap host7d
+keys [ [ [; sleep 0.6
+keys Tab; sleep 0.5; snap items
+keys / ; keys c p u; sleep 0.4; snap itemfilter; keys Escape; sleep 0.2
+keys Escape; sleep 0.3; snap back
 sleep 0.3; keys q; sleep 0.8
 tmux -L $sock kill-server 2>/dev/null
 kill $MP

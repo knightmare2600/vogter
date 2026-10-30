@@ -280,7 +280,7 @@ func tui(o options, path string, stderr io.Writer) int {
 	interval := time.Duration(c.RefreshInterval) * time.Second
 	events := make(chan poller.Event)
 	cmds := make(chan poller.Cmd, 1)
-	pl := &poller.Poller{API: newClient(p), Auth: auth, Interval: interval}
+	pl := poller.New(newClient(p), auth, interval, ui.PollerFmt)
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -296,6 +296,7 @@ func tui(o options, path string, stderr io.Writer) int {
 		Events:     events,
 		Cmds:       cmds,
 		Ack:        pl.Acknowledge,
+		Watch:      pl.Watch,
 	})
 	_, err = tea.NewProgram(m, colourProfile()...).Run()
 	cancel()

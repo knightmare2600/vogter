@@ -28,6 +28,12 @@ type fakeAPI struct {
 	extraErr     error
 	historyErrs  []error
 	historyTypes []int
+	historyFrom  []int64
+	history      []zabbix.HistoryPoint
+	hostItems    []zabbix.Item
+	trends       []zabbix.TrendPoint
+	trendErr     error
+	trendFrom    []int64
 }
 
 func (f *fakeAPI) log(s string) { f.mu.Lock(); f.calls = append(f.calls, s); f.mu.Unlock() }
@@ -106,17 +112,33 @@ func (f *fakeAPI) ItemsByPrefix(ctx context.Context, _, _ []string) ([]zabbix.It
 	return []zabbix.Item{{ItemID: "9", HostID: "1", Key: `net.if.in["eth0"]`, LastValue: "5", LastClock: "1", ValueType: "3"}}, nil
 }
 
-func (f *fakeAPI) History(_ context.Context, ids []string, vt int, _ int64) ([]zabbix.HistoryPoint, error) {
+func (f *fakeAPI) History(_ context.Context, ids []string, vt int, from int64) ([]zabbix.HistoryPoint, error) {
 	f.log("history")
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.historyTypes = append(f.historyTypes, vt)
+	f.historyFrom = append(f.historyFrom, from)
 	if len(f.historyErrs) > 0 {
 		err := f.historyErrs[0]
 		f.historyErrs = f.historyErrs[1:]
 		return nil, err
 	}
-	return nil, nil
+	return f.history, nil
+}
+
+func (f *fakeAPI) Trends(_ context.Context, ids []string, from int64) ([]zabbix.TrendPoint, error) {
+	f.log("trends")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.trendFrom = append(f.trendFrom, from)
+	return f.trends, f.trendErr
+}
+
+func (f *fakeAPI) HostItems(context.Context, string) ([]zabbix.Item, error) {
+	f.log("hostitems")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.hostItems, nil
 }
 
 func (f *fakeAPI) Acknowledge(context.Context, []string, string, bool) error {
@@ -142,7 +164,7 @@ func start(t *testing.T, api *fakeAPI, auth config.Auth, interval time.Duration)
 	cmds := make(chan Cmd, 1)
 	events := make(chan Event, 16)
 	done := make(chan struct{})
-	p := &Poller{API: api, Auth: auth, Interval: interval}
+	p := New(api, auth, interval, Fmt{})
 	go func() { defer close(done); p.Run(ctx, cmds, events) }()
 	return cmds, events, cancel, done
 }
@@ -247,7 +269,7 @@ func cpuItem(id, valueType string) zabbix.Item {
 }
 
 func direct(api *fakeAPI) *Poller {
-	return &Poller{API: api, Auth: config.Auth{Token: "t"}, Now: time.Now}
+	return New(api, config.Auth{Token: "t"}, time.Hour, Fmt{})
 }
 
 func TestExtraFailureKeepsSnapshotAndBacksOff(t *testing.T) {
@@ -319,7 +341,7 @@ func TestSeedUsesItemValueType(t *testing.T) {
 
 func TestTriggerIDsUnique(t *testing.T) {
 	api := &problemAPI{fakeAPI: &fakeAPI{}}
-	p := &Poller{API: api, Now: time.Now}
+	p := New(api, config.Auth{}, time.Hour, Fmt{})
 	if _, err := p.snapshot(context.Background()); err != nil {
 		t.Fatal(err)
 	}

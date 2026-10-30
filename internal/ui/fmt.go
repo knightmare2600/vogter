@@ -8,8 +8,12 @@ import (
 	"time"
 
 	"github.com/knightmare2600/vogter/internal/model"
+	"github.com/knightmare2600/vogter/internal/poller"
 	"github.com/knightmare2600/vogter/internal/zabbix"
 )
+
+// PollerFmt gives the poller the formatting used for host facts.
+var PollerFmt = poller.Fmt{Bytes: fmtBytes, Duration: fmtDuration}
 
 func fmtBytes(v float64) string { return scaled(v, 1024, "B", "KiB", "MiB", "GiB", "TiB", "PiB") }
 

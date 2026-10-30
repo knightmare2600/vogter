@@ -272,3 +272,78 @@ func TestSeries(t *testing.T) {
 		t.Error("Retain must drop other items")
 	}
 }
+
+func TestPickCharted(t *testing.T) {
+	items := []zabbix.Item{
+		item("1", "1", KeyCPU, "1"),
+		item("2", "1", `net.if.in["eth0"]`, "100"),
+		item("3", "1", `net.if.in["eth1"]`, "900"),
+		item("4", "1", `net.if.in["lo"]`, "9999"),
+		item("5", "1", `net.if.out["eth0"]`, "1"),
+		item("6", "1", `net.if.out["eth1"]`, "2"),
+	}
+	c := PickCharted(items)
+	if c.CPU.ItemID != "1" || c.NetIn.ItemID != "3" || c.NetOut.ItemID != "6" || c.Mem != nil {
+		t.Errorf("%+v", c)
+	}
+	if len(c.All()) != 3 {
+		t.Errorf("%d", len(c.All()))
+	}
+	if PickCharted(nil).NetOut != nil {
+		t.Error("no items, no charts")
+	}
+}
+
+func TestDisksFactsAndItems(t *testing.T) {
+	items := []zabbix.Item{
+		item("1", "1", "vfs.fs.dependent.size[/var,pused]", "60"),
+		item("2", "1", "vfs.fs.dependent.size[/,pused]", "40"),
+		item("3", "1", "vfs.fs.dependent.size[/etc/hosts,pused]", "99"),
+		item("4", "1", "system.sw.os", "Debian"),
+		item("5", "1", "system.hostname", ""),
+		item("6", "1", KeyNCPU, "8"),
+		item("7", "1", "vm.memory.size[total]", "1024"),
+		item("8", "1", KeyUptime, "60"),
+	}
+	d := Disks(items)
+	if len(d) != 2 || d[0].Mount != "/" || d[1].Mount != "/var" {
+		t.Errorf("%+v", d)
+	}
+	f := Facts(items, func(float64) string { return "1 KiB" }, func(int64) string { return "1m" })
+	want := []Fact{{"OS", "Debian"}, {"CPUs", "8"}, {"Memory", "1 KiB"}, {"Uptime", "1m"}}
+	if len(f) != len(want) {
+		t.Fatalf("%+v", f)
+	}
+	for i := range want {
+		if f[i] != want[i] {
+			t.Errorf("%+v", f)
+		}
+	}
+	if got := FilterItems(items, "OS"); len(got) != 3 { // sw.os, hostname, /etc/hosts
+		t.Errorf("%d", len(got))
+	}
+	if got := FilterItems(items, ""); len(got) != len(items) {
+		t.Errorf("%d", len(got))
+	}
+}
+
+func TestMerge(t *testing.T) {
+	old := []Point{{T: 10, V: 1}, {T: 20, V: 2}, {T: 30, V: 3}}
+	got := Merge(old, []Point{{T: 20, V: 9}, {T: 40, V: 4}}, 15)
+	want := []Point{{T: 20, V: 9}, {T: 40, V: 4}}
+	if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+		t.Errorf("%+v", got)
+	}
+	if got := Merge(old, nil, 25); len(got) != 1 || got[0].T != 30 {
+		t.Errorf("%+v", got)
+	}
+	if old[1].V != 2 {
+		t.Error("Merge must not change its input")
+	}
+	if p, ok := ParsePoint("10", "1.5"); !ok || p != (Point{T: 10, V: 1.5}) {
+		t.Errorf("%+v", p)
+	}
+	if _, ok := ParsePoint("x", "1"); ok {
+		t.Error("bad clock accepted")
+	}
+}

@@ -17,5 +17,6 @@ refer to zabterm commit `d57c642`. Nothing has been submitted yet.
 | D9 | Fixed (M3) | `api.rs:90`, `dashboard.rs` | Counts silently cap at `limit:500` | More than 500 active problems | Flag a full page and show `500+` |
 | D19 | Fixed (M3) | `worker.rs:114-134` | Sparkline buffers are never dropped for removed items | Delete items during a long run; memory grows slowly | `retain` the maps against the current item ids |
 | D20 | Fixed (M3) | `worker.rs:53-96` | One command at a time, so an acknowledge waits behind a slow poll | Slow server, press `a` then `⏎` during a poll | Spawn `acknowledge` as its own task; `Client` is already shared by reference |
+| D2 | Fixed (M4) | `app.rs:202-204,521-526`, `worker.rs:290-353` | Each snapshot on the host page triggers another detail request as well as the poll's, and each one re-reads the whole range, up to 7 days of raw history | Open a host, pick 7d, log requests: `history.get` from now-7d every poll, twice | Cache per item, set `time_from` to the newest sample + 1, and use `trend.get` from 24h up |
 
-Later milestones add D2, D4, D5, D8, D10–D13 and D21 as they are fixed.
+Later milestones add D4, D5, D8, D10–D13 and D21 as they are fixed.

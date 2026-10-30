@@ -523,3 +523,183 @@ func TestDescribe(t *testing.T) {
 		t.Error(got)
 	}
 }
+
+func detailFixture() model.HostDetail {
+	now := float64(testNow.Unix())
+	pts := []model.Point{{T: now - 1800, V: 20}, {T: now - 60, V: 42.5}}
+	return model.HostDetail{
+		HostID: "1", Range: 3600, CPU: pts, Mem: pts, Load: []model.Point{{T: now - 60, V: 1.25}},
+		NetIn: []model.Point{{T: now - 60, V: 12000}}, NetOut: []model.Point{{T: now - 60, V: 800}},
+		Disks: []model.Disk{{Mount: "/", Used: 71}, {Mount: "/var", Used: 95}},
+		Facts: []model.Fact{{Label: "OS", Value: "Debian 13"}, {Label: "CPUs", Value: "8"}},
+		Items: []zabbix.Item{
+			{ItemID: "1", Name: "CPU utilization", Key: "system.cpu.util", LastValue: "42.5", LastClock: fmt.Sprint(testNow.Unix() - 60), Units: "%", ValueType: "0"},
+			{ItemID: "2", Name: "OS name", Key: "system.sw.os", LastValue: "Debian", LastClock: fmt.Sprint(testNow.Unix() - 3700), ValueType: "4"},
+			{ItemID: "3", Name: "Never polled", Key: "custom.item", LastValue: "", LastClock: "0", ValueType: "0"},
+		},
+	}
+}
+
+type watched struct {
+	id  string
+	rng int64
+}
+
+func hostModel() (Model, *[]watched) {
+	calls := &[]watched{}
+	m, _ := newModel(nil)
+	m.opts.Watch = func(id string, r int64) { *calls = append(*calls, watched{id, r}) }
+	return live(m), calls
+}
+
+func withDetail(m Model) Model {
+	mm, _ := m.Update(eventMsg{poller.Detail{HostDetail: detailFixture()}})
+	return mm.(Model)
+}
+
+func TestOpenHostAndBack(t *testing.T) {
+	m, calls := hostModel()
+	m, _ = press(m, "2", "j", "enter") // problems sort: db-01, then web-01
+	if m.view != Host || m.detailHost != "1" || m.backTo != Hosts {
+		t.Fatalf("view=%v host=%q", m.view, m.detailHost)
+	}
+	if got := (*calls)[0]; got != (watched{"1", 3600}) {
+		t.Errorf("watch = %+v", got)
+	}
+	wants(t, plain(m), "loading history…", "› web-01")
+	m = withDetail(m)
+	wants(t, plain(m), "available", "OS Debian 13", "Graphs", "Latest data", "range 15m 1h 6h 24h 7d", "CPU  42%  · 1h", "Load 1m  1.25", "12.0 Kbps", "Filesystems", "/var", "95%", "Problems 2", "High CPU utilisation")
+	for _, key := range []string{"esc", "h", "backspace"} {
+		m, _ = press(m, "2", "enter")
+		*calls = nil
+		m, _ = press(m, key)
+		if m.view != Hosts {
+			t.Errorf("%s: view = %v", key, m.view)
+		}
+		if len(*calls) != 1 || (*calls)[0].id != "" {
+			t.Errorf("%s must stop the watch: %+v", key, *calls)
+		}
+	}
+	m, _ = press(m, "3", "enter")
+	if m.view != Host || m.backTo != Problems || m.detailHost != "2" {
+		t.Fatalf("from problems: %v %v %q", m.view, m.backTo, m.detailHost)
+	}
+	m, _ = press(m, "1")
+	if m.view != Dashboard {
+		t.Error("view keys leave the host page")
+	}
+	m, _ = press(m, "enter")
+	if m.view != Host || m.backTo != Dashboard {
+		t.Error("dashboard opens the selected host")
+	}
+}
+
+func TestRanges(t *testing.T) {
+	m, calls := hostModel()
+	m, _ = press(m, "2", "j", "enter")
+	m = withDetail(m)
+	*calls = nil
+	m, _ = press(m, "[", "[", "[")
+	if m.rangeIdx != 0 || len(*calls) != 1 || (*calls)[0].rng != 900 {
+		t.Errorf("idx=%d calls=%+v, clamp at the bottom", m.rangeIdx, *calls)
+	}
+	mm, _ := m.Update(eventMsg{poller.Detail{HostDetail: detailFixture()}})
+	m = mm.(Model)
+	if m.detail.Range != 3600 {
+		t.Log("old detail retained")
+	}
+	*calls = nil
+	m, _ = press(m, "]", "]", "]", "]", "]", "]")
+	if m.rangeIdx != len(ranges)-1 || len(*calls) != 4 {
+		t.Errorf("idx=%d calls=%d, clamp at the top", m.rangeIdx, len(*calls))
+	}
+}
+
+func TestLateDetailDropped(t *testing.T) {
+	m, _ := hostModel()
+	m, _ = press(m, "2", "enter") // db-01, id 2
+	m = withDetail(m)             // detail for host 1
+	if m.detail != nil {
+		t.Error("detail for another host must be ignored")
+	}
+}
+
+func TestLatestData(t *testing.T) {
+	m, _ := hostModel()
+	m, _ = press(m, "2", "j", "enter")
+	m = withDetail(m)
+	m, _ = press(m, "/")
+	if m.editing {
+		t.Error("the graphs tab has no filter")
+	}
+	m, _ = press(m, "tab")
+	wants(t, plain(m), "Latest data  3 of 3", "system.cpu.util", "42.5%", "1m ago", "never", "1h 1m ago")
+	m, _ = press(m, "j", "j", "j")
+	if m.itemSel != 2 {
+		t.Errorf("sel = %d", m.itemSel)
+	}
+	m, _ = press(m, "/")
+	m = typed(m, "OS")
+	wants(t, plain(m), "Latest data  1 of 3", "/OS", "OS name")
+	if m.itemSel != 0 {
+		t.Errorf("selection must stay in range: %d", m.itemSel)
+	}
+	m, _ = press(m, "enter", "i")
+	if m.hostTab != tabGraphs {
+		t.Error("i toggles the tab")
+	}
+	m, _ = press(m, "esc", "2", "enter")
+	if m.itemFilter != "OS" {
+		t.Error("returning to the same host keeps its filter")
+	}
+	m, _ = press(m, "esc", "k", "enter")
+	if m.itemFilter != "" {
+		t.Error("another host starts clean")
+	}
+}
+
+func TestHostPageMissingData(t *testing.T) {
+	m, _ := hostModel()
+	m, _ = press(m, "2", "j", "enter")
+	d := detailFixture()
+	d.CPU, d.Mem, d.Load, d.NetIn, d.NetOut, d.Disks, d.Items, d.Facts = nil, nil, nil, nil, nil, nil, nil, nil
+	mm, _ := m.Update(eventMsg{poller.Detail{HostDetail: d}})
+	m = mm.(Model)
+	wants(t, plain(m), "CPU  -", "no data yet", "no filesystems", "Network  ↓ -  ↑ -")
+	if strings.Contains(plain(m), "CPU  0") {
+		t.Error("missing metrics must not read as zero")
+	}
+}
+
+func TestHostVanishes(t *testing.T) {
+	m, _ := hostModel()
+	m, _ = press(m, "2", "j", "enter")
+	m = withDetail(m)
+	snap := fixture()
+	snap.Hosts = snap.Hosts[1:]
+	mm, _ := m.Update(eventMsg{poller.Snapshot{Snapshot: snap}})
+	if out := plain(mm.(Model)); !strings.Contains(out, "Host") {
+		t.Error(out)
+	}
+}
+
+func TestHostPageFits(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {100, 30}, {130, 40}, {170, 50}} {
+		for _, keys := range [][]string{{}, {"tab"}, {"]", "]", "]"}} {
+			m, _ := hostModel()
+			mm, _ := m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+			m, _ = press(mm.(Model), "2", "j", "enter")
+			m = withDetail(m)
+			m, _ = press(m, keys...)
+			lines := strings.Split(m.render(), "\n")
+			if len(lines) != size[1] {
+				t.Errorf("%v %v: %d lines", size, keys, len(lines))
+			}
+			for i, l := range lines {
+				if lipgloss.Width(l) > size[0] {
+					t.Errorf("%v %v: line %d too wide: %d", size, keys, i, lipgloss.Width(l))
+				}
+			}
+		}
+	}
+}

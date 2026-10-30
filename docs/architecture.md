@@ -30,6 +30,9 @@ tools/compare.sh    drives a binary under tmux for screen and request comparison
 - `zabbix.Client` returns `*zabbix.Error` with a `Kind` (transport, http, decode, rpc, auth, permission,
   shape). A failed call never returns data, so an error can't look like an empty inventory or a zero
   metric.
+- The host page calls `Poller.Watch`. A separate detail loop fetches the watched host after each poll,
+  keeping a per-item cache so each fetch reads only new samples. Ranges of 24h and up read `trend.get`,
+  then raw history from the end of the last trend bucket.
 - Acknowledge calls `Poller.Acknowledge` from a `tea.Cmd`, outside the poll loop. Success requests a
   refresh.
 - Rendering builds each screen as a slice of lines. Lip Gloss has no border titles, so `panel` draws its

@@ -36,6 +36,8 @@ type API interface {
 	ItemsByKey(ctx context.Context, hostIDs, keys []string) ([]zabbix.Item, error)
 	ItemsByPrefix(ctx context.Context, hostIDs, prefixes []string) ([]zabbix.Item, error)
 	History(ctx context.Context, itemIDs []string, valueType int, from int64) ([]zabbix.HistoryPoint, error)
+	Trends(ctx context.Context, itemIDs []string, from int64) ([]zabbix.TrendPoint, error)
+	HostItems(ctx context.Context, hostID string) ([]zabbix.Item, error)
 	Acknowledge(ctx context.Context, eventIDs []string, message string, close bool) error
 }
 
@@ -59,11 +61,15 @@ type Connected struct {
 // Snapshot is one complete poll.
 type Snapshot struct{ model.Snapshot }
 
+// Detail is one fetch of the watched host.
+type Detail struct{ model.HostDetail }
+
 // Failed reports an error; the next trigger retries.
 type Failed struct{ Err error }
 
 func (Connected) isEvent() {}
 func (Snapshot) isEvent()  {}
+func (Detail) isEvent()    {}
 func (Failed) isEvent()    {}
 
 // Poller runs the poll loop.
@@ -73,10 +79,21 @@ type Poller struct {
 	Interval time.Duration
 	// Now is the clock, for tests.
 	Now func() time.Time
+	// Fmt formats host facts.
+	Fmt Fmt
 
 	connected  bool
 	series     *model.Series
 	extraRetry time.Time
+
+	mu         sync.Mutex
+	watching   watch
+	detailPoke chan struct{}
+}
+
+// New builds a poller.
+func New(api API, auth config.Auth, interval time.Duration, f Fmt) *Poller {
+	return &Poller{API: api, Auth: auth, Interval: interval, Fmt: f, Now: time.Now, detailPoke: make(chan struct{}, 1)}
 }
 
 // Acknowledge runs outside the poll loop, so it does not wait behind a slow
@@ -90,9 +107,10 @@ func (p *Poller) Acknowledge(ctx context.Context, eventIDs []string, message str
 // Refresh. Requests that arrive while a poll is running are coalesced into
 // one follow-up poll. On exit it closes any user.login session.
 func (p *Poller) Run(ctx context.Context, cmds <-chan Cmd, events chan<- Event) {
-	if p.Now == nil {
-		p.Now = time.Now
-	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() { defer wg.Done(); p.detailLoop(ctx, events) }()
+	defer wg.Wait()
 	defer func() {
 		lctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -103,6 +121,7 @@ func (p *Poller) Run(ctx context.Context, cmds <-chan Cmd, events chan<- Event) 
 	defer ticker.Stop()
 	for {
 		p.poll(ctx, events)
+		p.pokeDetail()
 		// Drain anything that queued up during the poll: one follow-up
 		// poll covers all of it.
 		pending := false

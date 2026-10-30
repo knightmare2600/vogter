@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/knightmare2600/vogter/internal/config"
 	"github.com/knightmare2600/vogter/internal/model"
@@ -26,6 +27,15 @@ const (
 	Dashboard View = iota
 	Hosts
 	Problems
+	Host
+)
+
+// hostTab is a host page tab.
+type hostTab int
+
+const (
+	tabGraphs hostTab = iota
+	tabItems
 )
 
 const (
@@ -89,11 +99,14 @@ type Options struct {
 	Events     <-chan poller.Event
 	Cmds       chan<- poller.Cmd
 	Ack        AckFunc
+	// Watch selects the host whose detail the poller follows; an empty id
+	// stops it. It must not block.
+	Watch func(hostID string, rangeSecs int64)
 }
 
 // scrolls keeps table offsets. They live behind pointers because rendering
 // updates them, like ratatui's TableState, and View has a value receiver.
-type scrolls struct{ dash, hosts, problems *scroller }
+type scrolls struct{ dash, hosts, problems, items *scroller }
 
 // Model is the whole UI state.
 type Model struct {
@@ -123,6 +136,14 @@ type Model struct {
 	dashMem                   bool
 	hostSel, problemSel       int
 
+	backTo     View
+	detailHost string
+	detail     *model.HostDetail
+	rangeIdx   int
+	hostTab    hostTab
+	itemFilter string
+	itemSel    int
+
 	quitting bool
 }
 
@@ -132,9 +153,11 @@ func New(o Options) Model {
 		opts:     o,
 		theme:    theme.Load(o.Theme),
 		now:      time.Now,
-		scroll:   scrolls{&scroller{}, &scroller{}, &scroller{}},
+		scroll:   scrolls{&scroller{}, &scroller{}, &scroller{}, &scroller{}},
 		loading:  true,
 		hostSort: model.SortProblems,
+		rangeIdx: 1,
+		backTo:   Hosts,
 	}
 }
 
@@ -219,6 +242,13 @@ func (m *Model) onEvent(ev poller.Event) {
 		snap := ev.Snapshot
 		m.snapshot = &snap
 		m.clampSelection()
+	case poller.Detail:
+		// A late answer for another host or range is dropped.
+		if ev.HostID == m.detailHost && ev.Range == ranges[m.rangeIdx].secs {
+			d := ev.HostDetail
+			m.detail = &d
+			m.clampSelection()
+		}
 	case poller.Failed:
 		m.loading = false
 		msg := describe(ev.Err)
@@ -282,6 +312,7 @@ func (m Model) filteredProblems() []*model.Problem {
 func (m *Model) clampSelection() {
 	m.hostSel = min(m.hostSel, max(len(m.filteredHosts())-1, 0))
 	m.problemSel = min(m.problemSel, max(len(m.filteredProblems())-1, 0))
+	m.itemSel = min(m.itemSel, max(len(m.filteredItems())-1, 0))
 }
 
 func (m *Model) moveSelection(delta int) {
@@ -290,6 +321,45 @@ func (m *Model) moveSelection(delta int) {
 		m.hostSel = max(min(m.hostSel+delta, len(m.filteredHosts())-1), 0)
 	case Problems:
 		m.problemSel = max(min(m.problemSel+delta, len(m.filteredProblems())-1), 0)
+	case Host:
+		if m.hostTab == tabItems {
+			m.itemSel = max(min(m.itemSel+delta, len(m.filteredItems())-1), 0)
+		}
+	}
+}
+
+func (m *Model) watch(hostID string) {
+	if m.opts.Watch != nil {
+		m.opts.Watch(hostID, ranges[m.rangeIdx].secs)
+	}
+}
+
+func (m *Model) openHost(id string) {
+	if m.detailHost != id {
+		m.detail = nil
+		m.itemFilter = ""
+		m.itemSel = 0
+	}
+	m.detailHost = id
+	m.backTo = m.view
+	m.view = Host
+	m.hostTab = tabGraphs
+	m.watch(id)
+}
+
+// show switches view, leaving the host page cleanly if it was open.
+func (m *Model) show(v View) {
+	if m.view == Host && v != Host {
+		m.watch("")
+	}
+	m.view = v
+}
+
+func (m *Model) shiftRange(delta int) {
+	next := max(min(m.rangeIdx+delta, len(ranges)-1), 0)
+	if next != m.rangeIdx {
+		m.rangeIdx = next
+		m.watch(m.detailHost)
 	}
 }
 
@@ -300,6 +370,10 @@ func (m *Model) filter() *string {
 		return &m.hostFilter
 	case Problems:
 		return &m.problemFilter
+	case Host:
+		if m.hostTab == tabItems {
+			return &m.itemFilter
+		}
 	}
 	return nil
 }
@@ -351,15 +425,20 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "?":
 		m.help = true
 	case "1":
-		m.view = Dashboard
+		m.show(Dashboard)
 	case "2":
-		m.view = Hosts
+		m.show(Hosts)
 	case "3":
-		m.view = Problems
+		m.show(Problems)
 	case "tab":
+		if m.view == Host {
+			return m.onViewKey(key)
+		}
 		m.view = (m.view + 1) % 3
 	case "shift+tab":
-		m.view = (m.view + 2) % 3
+		if m.view != Host {
+			m.view = (m.view + 2) % 3
+		}
 	case "r":
 		m.refresh()
 	case "t":
@@ -370,7 +449,9 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.editing = true
 		}
 	case "esc":
-		if f := m.filter(); f != nil {
+		if m.view == Host {
+			m.show(m.backTo)
+		} else if f := m.filter(); f != nil {
 			*f = ""
 		}
 	case "down", "j":
@@ -396,7 +477,9 @@ func (m Model) onViewKey(key string) (tea.Model, tea.Cmd) {
 	case Dashboard, Hosts:
 		switch key {
 		case "enter", "l":
-			m.addToast(toastInfo, "Host page", "arrives in Milestone 4")
+			if hs := m.filteredHosts(); m.hostSel < len(hs) {
+				m.openHost(hs[m.hostSel].ID)
+			}
 		case "m":
 			if m.view == Dashboard {
 				m.dashMem = !m.dashMem
@@ -410,7 +493,9 @@ func (m Model) onViewKey(key string) (tea.Model, tea.Cmd) {
 	case Problems:
 		switch key {
 		case "enter", "l":
-			m.addToast(toastInfo, "Host page", "arrives in Milestone 4")
+			if ps := m.filteredProblems(); m.problemSel < len(ps) && ps[m.problemSel].HostID != "" {
+				m.openHost(ps[m.problemSel].HostID)
+			}
 		case "a":
 			if ps := m.filteredProblems(); m.problemSel < len(ps) {
 				p := ps[m.problemSel]
@@ -425,6 +510,17 @@ func (m Model) onViewKey(key string) (tea.Model, tea.Cmd) {
 		case "h":
 			m.hideAcked = !m.hideAcked
 			m.problemSel = 0
+		}
+	case Host:
+		switch key {
+		case "[":
+			m.shiftRange(-1)
+		case "]":
+			m.shiftRange(1)
+		case "tab", "i":
+			m.hostTab = 1 - m.hostTab
+		case "h", "backspace":
+			m.show(m.backTo)
 		}
 	}
 	return m, nil
@@ -503,6 +599,8 @@ func (m Model) render() string {
 		body = m.dashboard(m.width, bodyH)
 	case m.view == Hosts:
 		body = m.hostsView(m.width, bodyH)
+	case m.view == Host:
+		body = m.hostView(m.width, bodyH)
 	default:
 		body = m.problemsView(m.width, bodyH)
 	}
@@ -510,7 +608,9 @@ func (m Model) render() string {
 	for len(body) < bodyH {
 		body = append(body, "")
 	}
-	base := m.header() + "\n" + strings.Join(body, "\n") + "\n" + m.footer()
+	// Header and footer clip rather than wrap on a narrow terminal.
+	head := strings.SplitN(m.header(), "\n", 2)[0]
+	base := ansi.Truncate(head, m.width, "") + "\n\n" + strings.Join(body, "\n") + "\n" + ansi.Truncate(m.footer(), m.width, "")
 
 	layers := []*lipgloss.Layer{lipgloss.NewLayer(base)}
 	y := headerH
@@ -576,7 +676,8 @@ func (m Model) header() string {
 	}
 	for i, name := range viewNames {
 		st := s.Foreground(t.Muted)
-		if View(i) == m.view {
+		// While on a host page, keep the list the user came from lit.
+		if View(i) == m.view || (m.view == Host && View(i) == m.backTo) {
 			st = s.Foreground(t.Accent).Bold(true).Underline(true)
 		}
 		c := t.Muted
@@ -584,6 +685,13 @@ func (m Model) header() string {
 			c = countColour
 		}
 		left = append(left, s.Foreground(t.Border).Render(fmt.Sprintf("%d ", i+1)), st.Render(name), s.Foreground(c).Bold(true).Render(counts[i]), "   ")
+	}
+	if m.view == Host {
+		name := ""
+		if r := m.detailRow(); r != nil {
+			name = r.Name
+		}
+		left = append(left, fg(t.Border).Render("› "), fg(t.Accent).Bold(true).Underline(true).Render(name))
 	}
 	l := strings.Join(left, "")
 
@@ -634,6 +742,12 @@ func (m Model) hints() [][2]string {
 		return [][2]string{{"j/k", "move"}, {"⏎", "open"}, {"/", "filter"}, {"s", "sort"}, {"r", "refresh"}, {"?", "help"}}
 	case Problems:
 		return [][2]string{{"j/k", "move"}, {"a", "ack"}, {"⏎", "host"}, {"+/-", "severity"}, {"h", "hide acked"}, {"/", "filter"}, {"?", "help"}}
+	}
+	if m.view == Host {
+		if m.hostTab == tabItems {
+			return [][2]string{{"esc", "back"}, {"tab", "graphs"}, {"/", "filter"}, {"j/k", "move"}, {"?", "help"}}
+		}
+		return [][2]string{{"esc", "back"}, {"[ ]", "range"}, {"tab", "items"}, {"r", "refresh"}, {"?", "help"}}
 	}
 	return [][2]string{{"j/k", "select"}, {"⏎", "open"}, {"m", "cpu/mem"}, {"tab", "next"}, {"t", "theme"}, {"?", "help"}, {"q", "quit"}}
 }
@@ -709,9 +823,9 @@ func (m Model) helpBox() string {
 		keys [][2]string
 	}{
 		{"Global", [][2]string{{"1 2 3 / tab", "switch view"}, {"r", "refresh now"}, {"t", "cycle theme"}, {"?", "this help"}, {"q", "quit"}}},
-		{"Lists", [][2]string{{"j k ↑ ↓", "move"}, {"g G", "top / bottom"}, {"ctrl-d ctrl-u", "page"}, {"/", "filter"}}},
-		{"Hosts", [][2]string{{"s", "cycle sort"}, {"m", "dashboard cpu / memory"}}},
+		{"Lists", [][2]string{{"j k ↑ ↓", "move"}, {"g G", "top / bottom"}, {"ctrl-d ctrl-u", "page"}, {"/", "filter"}, {"⏎", "drill into host"}}},
 		{"Problems", [][2]string{{"a", "acknowledge (+ message, close)"}, {"+ -", "minimum severity"}, {"h", "hide acknowledged"}}},
+		{"Host", [][2]string{{"[ ]", "time range 15m → 7d"}, {"tab", "graphs / latest data"}, {"esc", "back"}}},
 	}
 	lines := []string{""}
 	for _, sec := range sections {

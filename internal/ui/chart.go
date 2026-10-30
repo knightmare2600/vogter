@@ -158,7 +158,8 @@ func timeChart(t *theme.Theme, w, h int, o panelOpts, series []chartSeries, x0, 
 	}
 	top := chartTop(series, floor, y)
 	labels := [3]string{y.label(top), y.label(top / 2), y.label(0)}
-	lw := max(lipgloss.Width(labels[0]), lipgloss.Width(labels[1]), lipgloss.Width(labels[2]))
+	// ratatui reserves room for the first X label, which starts left of the axis.
+	lw := max(lipgloss.Width(labels[0]), lipgloss.Width(labels[1]), lipgloss.Width(labels[2]), 4)
 	axis := fg(t.Border)
 	muted := fg(t.Muted)
 

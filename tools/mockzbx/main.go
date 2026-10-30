@@ -111,9 +111,24 @@ func result(method string, params json.RawMessage) string {
 ]`, now-90000, now-120, now-600)
 	case "item.get":
 		var p struct {
-			Search *struct{} `json:"search"`
+			Search  *struct{} `json:"search"`
+			HostIDs []string  `json:"hostids"`
 		}
 		_ = json.Unmarshal(params, &p)
+		if len(p.HostIDs) == 1 {
+			return "[" + strings.Join([]string{
+				item("1001", "10084", "CPU utilization", "system.cpu.util", "42.5", "%", "0", now),
+				item("1002", "10084", "Memory utilization", "vm.memory.util", "61.2", "%", "0", now),
+				item("1003", "10084", "Load", "system.cpu.load[all,avg1]", "1.25", "", "0", now),
+				item("1004", "10084", "Uptime", "system.uptime", "93784", "uptime", "3", now),
+				item("1005", "10084", "CPUs", "system.cpu.num", "8", "", "3", now),
+				item("1006", "10084", "OS", "system.sw.os", "Debian 13", "", "1", now),
+				item("1007", "10084", "Total memory", "vm.memory.size[total]", "8393289728", "B", "3", now),
+				item("2001", "10084", "eth0 in", `net.if.in[\"eth0\"]`, "12000", "bps", "3", now),
+				item("2002", "10084", "eth0 out", `net.if.out[\"eth0\"]`, "800", "bps", "3", now),
+				item("2003", "10084", "/: used", "vfs.fs.dependent.size[/,pused]", "71.5", "%", "0", now),
+			}, ",") + "]"
+		}
 		if p.Search != nil {
 			return "[" + strings.Join([]string{
 				item("2001", "10084", "eth0 in", `net.if.in["eth0"]`, "12000", "bps", "3", now),
@@ -134,17 +149,36 @@ func result(method string, params json.RawMessage) string {
 			item("1022", "10086", "Memory utilization", "vm.memory.util", "30", "%", "0", now),
 		}, ",") + "]"
 	case "history.get":
-		var b strings.Builder
-		b.WriteString("[")
-		for i, id := range []string{"1001", "1002", "1021", "1022"} {
-			for j := int64(0); j < 30; j++ {
-				if i > 0 || j > 0 {
-					b.WriteString(",")
+		var p struct {
+			ItemIDs  []string `json:"itemids"`
+			TimeFrom int64    `json:"time_from"`
+		}
+		_ = json.Unmarshal(params, &p)
+		var rows []string
+		// One sample a minute on the minute, so re-reads see the same data.
+		for i, id := range p.ItemIDs {
+			for c := (now - 1740) / 60 * 60; c <= now; c += 60 {
+				if c >= p.TimeFrom {
+					rows = append(rows, fmt.Sprintf(`{"itemid":%q,"clock":"%d","value":"%d","ns":"0"}`, id, c, 20+(c/60*7+int64(i)*13)%50))
 				}
-				fmt.Fprintf(&b, `{"itemid":%q,"clock":"%d","value":"%d","ns":"0"}`, id, now-1740+j*60, 20+(j*7+int64(i)*13)%50)
 			}
 		}
-		return b.String() + "]"
+		return "[" + strings.Join(rows, ",") + "]"
+	case "trend.get":
+		var p struct {
+			ItemIDs  []string `json:"itemids"`
+			TimeFrom int64    `json:"time_from"`
+		}
+		_ = json.Unmarshal(params, &p)
+		var rows []string
+		for i, id := range p.ItemIDs {
+			for c := (now-7*86400)/3600*3600 + 3600; c < now-3600; c += 3600 {
+				if c >= p.TimeFrom {
+					rows = append(rows, fmt.Sprintf(`{"itemid":%q,"clock":"%d","num":"60","value_min":"1","value_avg":"%d","value_max":"90"}`, id, c, 20+(c/3600*7+int64(i)*13)%50))
+				}
+			}
+		}
+		return "[" + strings.Join(rows, ",") + "]"
 	}
 	return `[]`
 }

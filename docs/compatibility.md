@@ -36,7 +36,9 @@ Updated as each milestone lands.
 Compared with zabterm 0.1.2 on 2026-10-30 at 150×45: both binaries against `tools/mockzbx`, with the
 same keys, using `tools/compare.sh` and `tools/cmpdiff.py`. The diff ignores the product name, clocks and
 braille dots. Dashboard and hosts screens matched on every line, and problems screens differed only by the
-`o web` hint. The set of API requests matched exactly.
+`o web` hint. The host page matched except for chart data captured at a different moment. The 24h and 7d
+charts differ by design (hourly trends). Polling requests matched exactly; host page requests differ as
+described below.
 
 | Area | zabterm | Vogter |
 |---|---|---|
@@ -48,8 +50,11 @@ braille dots. Dashboard and hosts screens matched on every line, and problems sc
 | Acknowledge (D20) | Queued behind a running poll | Runs at once on its own goroutine |
 | Sparkline seed (D6, D7) | Failure never retried; float items only | Retried next poll; float and unsigned items |
 | Sparkline buffers (D19) | Kept for removed items | Dropped |
+| Host page fetches (D2) | Two per poll, each re-reading the whole range | One per poll, reading only samples newer than those held |
+| 24h and 7d graphs | Raw `history.get` | Hourly `trend.get` averages plus raw history for the hours trends do not cover yet. An item without trends falls back to raw history |
+| Host page and polls | Host page waits behind a running poll | Fetched on its own goroutine |
+| Late detail for another host or range | Range mismatch shown briefly | Dropped |
 
 ## Not yet ported (by milestone)
 
-- M4: host page (`⏎` shows a placeholder toast until then), latest data, graphs (24h/7d from `trend.get`).
 - M5: Omarchy themes, notifications, `vogter import`, browser opener (`o`).
