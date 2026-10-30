@@ -4,6 +4,7 @@ package ui
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/knightmare2600/vogter/internal/config"
 	"github.com/knightmare2600/vogter/internal/model"
+	"github.com/knightmare2600/vogter/internal/notify"
+	"github.com/knightmare2600/vogter/internal/platform"
 	"github.com/knightmare2600/vogter/internal/poller"
 	"github.com/knightmare2600/vogter/internal/theme"
 	"github.com/knightmare2600/vogter/internal/zabbix"
@@ -70,6 +73,7 @@ const (
 	toastInfo toastKind = iota
 	toastOK
 	toastError
+	toastProblem
 )
 
 type toast struct {
@@ -77,6 +81,7 @@ type toast struct {
 	title string
 	body  string
 	born  time.Time
+	sev   model.Severity
 }
 
 // ackDialog is the acknowledge modal.
@@ -102,6 +107,15 @@ type Options struct {
 	// Watch selects the host whose detail the poller follows; an empty id
 	// stops it. It must not block.
 	Watch func(hostID string, rangeSecs int64)
+	// WebURL is the frontend base URL.
+	WebURL string
+	// Desktop turns on desktop notifications; MinSeverity filters them
+	// and the toasts.
+	Desktop     bool
+	MinSeverity model.Severity
+	// Notify and Open reach the desktop.
+	Notify func(title, body string, urgent bool) error
+	Open   func(url string) error
 }
 
 // scrolls keeps table offsets. They live behind pointers because rendering
@@ -110,10 +124,14 @@ type scrolls struct{ dash, hosts, problems, items *scroller }
 
 // Model is the whole UI state.
 type Model struct {
-	opts   Options
-	theme  theme.Theme
-	now    func() time.Time
-	scroll scrolls
+	opts      Options
+	theme     theme.Theme
+	themeName string
+	themeSig  theme.Signature
+	seen      map[string]bool
+	warned    bool
+	now       func() time.Time
+	scroll    scrolls
 
 	width, height int
 	view          View
@@ -150,14 +168,16 @@ type Model struct {
 // New builds the model.
 func New(o Options) Model {
 	return Model{
-		opts:     o,
-		theme:    theme.Load(o.Theme),
-		now:      time.Now,
-		scroll:   scrolls{&scroller{}, &scroller{}, &scroller{}, &scroller{}},
-		loading:  true,
-		hostSort: model.SortProblems,
-		rangeIdx: 1,
-		backTo:   Hosts,
+		opts:      o,
+		theme:     theme.Load(o.Theme),
+		themeName: o.Theme,
+		themeSig:  theme.OmarchySignature(),
+		now:       time.Now,
+		scroll:    scrolls{&scroller{}, &scroller{}, &scroller{}, &scroller{}},
+		loading:   true,
+		hostSort:  model.SortProblems,
+		rangeIdx:  1,
+		backTo:    Hosts,
 	}
 }
 
@@ -188,6 +208,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tickMsg:
 		m.frame++
 		m.expireToasts()
+		// Every 2 s or so, follow an Omarchy theme switch.
+		if m.frame%8 == 0 && theme.Follows(m.themeName) {
+			if sig := theme.OmarchySignature(); sig != m.themeSig {
+				m.themeSig = sig
+				m.theme = theme.Load(m.themeName)
+				m.addToast(toastInfo, "Theme", m.theme.Name)
+			}
+		}
 		return m, tick()
 	case eventMsg:
 		m.onEvent(msg.Event)
@@ -213,7 +241,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) addToast(kind toastKind, title, body string) {
-	list := append([]toast{{kind, title, body, m.now()}}, m.toasts...)
+	m.pushToast(toast{kind: kind, title: title, body: body})
+}
+
+func (m *Model) pushToast(t toast) {
+	t.born = m.now()
+	list := append([]toast{t}, m.toasts...)
 	m.toasts = list[:min(len(list), maxToasts)]
 }
 
@@ -240,6 +273,7 @@ func (m *Model) onEvent(ev poller.Event) {
 		m.loading = false
 		m.err = ""
 		snap := ev.Snapshot
+		m.announce(&snap)
 		m.snapshot = &snap
 		m.clampSelection()
 	case poller.Detail:
@@ -258,6 +292,66 @@ func (m *Model) onEvent(ev poller.Event) {
 		}
 		m.err = msg
 	}
+}
+
+// announce tells the user what changed since the last snapshot.
+func (m *Model) announce(cur *model.Snapshot) {
+	notes, seen := notify.Diff(m.snapshot, cur, m.seen, m.opts.MinSeverity)
+	m.seen = seen
+	for _, n := range notes {
+		if m.opts.Desktop && m.opts.Notify != nil {
+			// A missing notifier is fine: the toast still shows. Only a
+			// platform without any is worth saying once.
+			if err := m.opts.Notify(n.Title, n.Body, n.Urgent); errors.Is(err, platform.ErrUnsupported) && !m.warned {
+				m.warned = true
+				m.addToast(toastInfo, "Desktop notifications", "not supported here; toasts only")
+			}
+		}
+		t := toast{kind: toastInfo, title: n.Title, body: n.Body}
+		switch n.Kind {
+		case notify.NewProblem:
+			t.kind, t.sev = toastProblem, n.Severity
+		case notify.Resolved, notify.HostUp:
+			t.kind = toastOK
+		case notify.HostDown:
+			t.kind = toastError
+		}
+		m.pushToast(t)
+	}
+}
+
+// webURL is the frontend page matching the current view.
+func (m Model) webURL() string {
+	const hostParam = "hostids%5B%5D="
+	base := m.opts.WebURL + "/zabbix.php?action="
+	switch m.view {
+	case Dashboard:
+		return base + "dashboard.view"
+	case Hosts:
+		if hs := m.filteredHosts(); m.hostSel < len(hs) {
+			return base + "latest.view&" + hostParam + hs[m.hostSel].ID
+		}
+		return base + "host.view"
+	case Problems:
+		// A problem without a host links to the plain list (D21).
+		if ps := m.filteredProblems(); m.problemSel < len(ps) && ps[m.problemSel].HostID != "" {
+			return base + "problem.view&" + hostParam + ps[m.problemSel].HostID
+		}
+		return base + "problem.view"
+	}
+	return base + "latest.view&" + hostParam + m.detailHost
+}
+
+func (m *Model) openBrowser() {
+	u := m.webURL()
+	if m.opts.Open == nil {
+		return
+	}
+	if err := m.opts.Open(u); err != nil {
+		m.addToast(toastError, "Could not open browser", err.Error())
+		return
+	}
+	m.addToast(toastInfo, "Opened in browser", u)
 }
 
 // describe turns an error into one line for the UI, adding a hint for the
@@ -442,8 +536,11 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		m.refresh()
 	case "t":
-		m.theme = theme.Load(theme.Next(m.theme.Name))
+		m.themeName = theme.Next(m.theme.Name)
+		m.theme = theme.Load(m.themeName)
 		m.addToast(toastInfo, "Theme", m.theme.Name)
+	case "o":
+		m.openBrowser()
 	case "/":
 		if m.filter() != nil {
 			m.editing = true
@@ -640,6 +737,8 @@ func (m Model) toastBox(t toast, w int) []string {
 		icon, colour = "✓", th.OK
 	case toastError:
 		icon, colour = "✕", th.Err
+	case toastProblem:
+		icon, colour = "▲", th.Sev[t.sev]
 	}
 	return panel(th, w, 4, panelOpts{border: colour}, []string{
 		fg(colour).Render(icon+" ") + title(th, truncate(t.title, w-6)),
@@ -739,17 +838,17 @@ func (m Model) header() string {
 func (m Model) hints() [][2]string {
 	switch m.view {
 	case Hosts:
-		return [][2]string{{"j/k", "move"}, {"⏎", "open"}, {"/", "filter"}, {"s", "sort"}, {"r", "refresh"}, {"?", "help"}}
+		return [][2]string{{"j/k", "move"}, {"⏎", "open"}, {"/", "filter"}, {"s", "sort"}, {"o", "web"}, {"r", "refresh"}, {"?", "help"}}
 	case Problems:
 		return [][2]string{{"j/k", "move"}, {"a", "ack"}, {"⏎", "host"}, {"+/-", "severity"}, {"h", "hide acked"}, {"/", "filter"}, {"?", "help"}}
 	}
 	if m.view == Host {
 		if m.hostTab == tabItems {
-			return [][2]string{{"esc", "back"}, {"tab", "graphs"}, {"/", "filter"}, {"j/k", "move"}, {"?", "help"}}
+			return [][2]string{{"esc", "back"}, {"tab", "graphs"}, {"/", "filter"}, {"j/k", "move"}, {"o", "web"}, {"?", "help"}}
 		}
-		return [][2]string{{"esc", "back"}, {"[ ]", "range"}, {"tab", "items"}, {"r", "refresh"}, {"?", "help"}}
+		return [][2]string{{"esc", "back"}, {"[ ]", "range"}, {"tab", "items"}, {"r", "refresh"}, {"o", "web"}, {"?", "help"}}
 	}
-	return [][2]string{{"j/k", "select"}, {"⏎", "open"}, {"m", "cpu/mem"}, {"tab", "next"}, {"t", "theme"}, {"?", "help"}, {"q", "quit"}}
+	return [][2]string{{"j/k", "select"}, {"⏎", "open"}, {"m", "cpu/mem"}, {"tab", "next"}, {"t", "theme"}, {"o", "web"}, {"?", "help"}, {"q", "quit"}}
 }
 
 func (m Model) footer() string {
@@ -822,7 +921,7 @@ func (m Model) helpBox() string {
 		name string
 		keys [][2]string
 	}{
-		{"Global", [][2]string{{"1 2 3 / tab", "switch view"}, {"r", "refresh now"}, {"t", "cycle theme"}, {"?", "this help"}, {"q", "quit"}}},
+		{"Global", [][2]string{{"1 2 3 / tab", "switch view"}, {"r", "refresh now"}, {"t", "cycle theme"}, {"o", "open in Zabbix web"}, {"?", "this help"}, {"q", "quit"}}},
 		{"Lists", [][2]string{{"j k ↑ ↓", "move"}, {"g G", "top / bottom"}, {"ctrl-d ctrl-u", "page"}, {"/", "filter"}, {"⏎", "drill into host"}}},
 		{"Problems", [][2]string{{"a", "acknowledge (+ message, close)"}, {"+ -", "minimum severity"}, {"h", "hide acknowledged"}}},
 		{"Host", [][2]string{{"[ ]", "time range 15m → 7d"}, {"tab", "graphs / latest data"}, {"esc", "back"}}},

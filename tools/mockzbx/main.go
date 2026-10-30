@@ -21,7 +21,10 @@ var mu sync.Mutex
 func main() {
 	addr := flag.String("addr", "127.0.0.1:18080", "listen address")
 	logPath := flag.String("log", "", "request log file (JSON lines)")
+	flip := flag.Duration("flip", 0, "after this long, a new problem appears, one resolves and web-01 goes down")
 	flag.Parse()
+	started := time.Now()
+	flipped := func() bool { return *flip > 0 && time.Since(started) > *flip }
 	var out io.Writer = io.Discard
 	if *logPath != "" {
 		f, err := os.Create(*logPath)
@@ -57,7 +60,7 @@ func main() {
 			fmt.Fprintf(w, `{"jsonrpc":"2.0","error":{"code":-32602,"message":"Invalid params.","data":"Not authorized."},"id":%s}`, id)
 			return
 		}
-		fmt.Fprintf(w, `{"jsonrpc":"2.0","result":%s,"id":%s}`, result(req.Method, req.Params), id)
+		fmt.Fprintf(w, `{"jsonrpc":"2.0","result":%s,"id":%s}`, result(req.Method, req.Params, flipped()), id)
 	})
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
@@ -88,7 +91,7 @@ func item(id, host, name, key, value, units, vtype string, clock int64) string {
 		id, host, name, key, value, clock, units, vtype)
 }
 
-func result(method string, params json.RawMessage) string {
+func result(method string, params json.RawMessage, flipped bool) string {
 	now := time.Now().Unix()
 	switch method {
 	case "apiinfo.version":
@@ -98,12 +101,21 @@ func result(method string, params json.RawMessage) string {
 	case "user.logout":
 		return `true`
 	case "host.get":
+		if flipped {
+			return strings.Replace(strings.Replace(hosts, `"available":"1","type":"1","error":""`, `"available":"2","type":"1","error":"Connection refused"`, 1), `"active_available":"1"`, `"active_available":"0"`, 1)
+		}
 		return hosts
 	case "trigger.get":
 		return triggers
 	case "event.acknowledge":
 		return `{"eventids":["501"]}`
 	case "problem.get":
+		if flipped {
+			return fmt.Sprintf(`[
+ {"eventid":"504","objectid":"9001","name":"Disk full","severity":"5","clock":"%d","acknowledged":"0","suppressed":"0","opdata":"","tags":[]},
+ {"eventid":"501","objectid":"9001","name":"High CPU utilisation","severity":"3","clock":"%d","acknowledged":"1","suppressed":"0","opdata":"","tags":[]}
+]`, now-5, now-600)
+		}
 		return fmt.Sprintf(`[
  {"eventid":"503","objectid":"9003","name":"Backup is late","severity":"2","clock":"%d","acknowledged":"0","suppressed":"1","opdata":"","tags":[]},
  {"eventid":"502","objectid":"9002","name":"Zabbix agent is not available","severity":"4","clock":"%d","acknowledged":"0","suppressed":"0","opdata":"","tags":[]},

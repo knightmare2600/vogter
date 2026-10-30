@@ -134,6 +134,6 @@ func (m Model) problemDetail(problems []*model.Problem, w int) []string {
 		wrapped = append(wrapped, strings.Split(ansi.Wrap(l, w-2, ""), "\n")...)
 	}
 	accent := fg(t.Accent).Bold(true)
-	bottom := accent.Render("a ") + muted.Render("acknowledge  ") + accent.Render("⏎ ") + muted.Render("host")
+	bottom := accent.Render("a ") + muted.Render("acknowledge  ") + accent.Render("⏎ ") + muted.Render("host  ") + accent.Render("o ") + muted.Render("web")
 	return panel(t, w, problemDetailH, panelOpts{title: title(t, "Details"), bottom: bottom, border: t.Sev[p.Severity]}, wrapped)
 }

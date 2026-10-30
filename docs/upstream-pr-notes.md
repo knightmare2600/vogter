@@ -18,5 +18,10 @@ refer to zabterm commit `d57c642`. Nothing has been submitted yet.
 | D19 | Fixed (M3) | `worker.rs:114-134` | Sparkline buffers are never dropped for removed items | Delete items during a long run; memory grows slowly | `retain` the maps against the current item ids |
 | D20 | Fixed (M3) | `worker.rs:53-96` | One command at a time, so an acknowledge waits behind a slow poll | Slow server, press `a` then `⏎` during a poll | Spawn `acknowledge` as its own task; `Client` is already shared by reference |
 | D2 | Fixed (M4) | `app.rs:202-204,521-526`, `worker.rs:290-353` | Each snapshot on the host page triggers another detail request as well as the poll's, and each one re-reads the whole range, up to 7 days of raw history | Open a host, pick 7d, log requests: `history.get` from now-7d every poll, twice | Cache per item, set `time_from` to the newest sample + 1, and use `trend.get` from 24h up |
+| D4 | Fixed (M5) | `theme.rs:114-140,178-181` | Omarchy 4 moved the theme to `~/.local/state/omarchy/current` and switched `colors.toml` to named keys, so `auto` silently becomes tokyo-night. Derived from Omarchy v4.0.6 source, not seen on a machine | Omarchy 4: `zabterm`, then `?` shows the theme | Check both directories; read `red`, `green`, ... and `muted`, falling back to `colorN` |
+| D5 | Fixed (M5) | `theme.rs:116` | Theme name comes from the canonical directory, which is `theme` on Omarchy 4 | As D4 | Read `current/theme.name` first |
+| D10 | Fixed (M5) | `app.rs:237-241` | Past `limit:500`, a problem pushed off the page is announced as resolved | More than 500 problems, a newer one arrives | Skip resolve notes when either snapshot holds a full page |
+| D11 | Fixed (M5, unverified on macOS) | `app.rs:607` | AppleScript text is built with Rust `{:?}`, which can emit `\\u{...}` escapes AppleScript does not know | Problem name with an emoji or control character | Pass the text as `osascript` arguments and read it from `argv` |
+| D21 | Fixed (M5) | `app.rs:590-593` | `o` on a problem with no host builds an empty `hostids[]=` | Problem whose trigger has no host | Fall back to `problem.view` |
 
-Later milestones add D4, D5, D8, D10–D13 and D21 as they are fixed.
+D8 (multi-host triggers), D12 and D13 are kept as they are; see `porting-audit.md` §13.

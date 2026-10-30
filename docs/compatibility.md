@@ -38,7 +38,8 @@ same keys, using `tools/compare.sh` and `tools/cmpdiff.py`. The diff ignores the
 braille dots. Dashboard and hosts screens matched on every line, and problems screens differed only by the
 `o web` hint. The host page matched except for chart data captured at a different moment. The 24h and 7d
 charts differ by design (hourly trends). Polling requests matched exactly; host page requests differ as
-described below.
+described below. With the mock's `-flip` mode and a recording `notify-send`, both sent the same three
+notifications with the same urgency.
 
 | Area | zabterm | Vogter |
 |---|---|---|
@@ -53,8 +54,11 @@ described below.
 | Host page fetches (D2) | Two per poll, each re-reading the whole range | One per poll, reading only samples newer than those held |
 | 24h and 7d graphs | Raw `history.get` | Hourly `trend.get` averages plus raw history for the hours trends do not cover yet. An item without trends falls back to raw history |
 | Host page and polls | Host page waits behind a running poll | Fetched on its own goroutine |
+| Omarchy (D4, D5) | Only `~/.config/omarchy/current` and `colorN` keys, so Omarchy 4 silently gets tokyo-night | Also `~/.local/state/omarchy/current`, named keys and `theme.name` |
+| Theme colour depth | Own nearest-256 mapping | Bubble Tea's colour-profile downsampling, so the 256-colour result can differ |
+| "Resolved" past 500 problems (D10) | False "Resolved" notes | None while the problem list is truncated |
+| macOS notification text (D11) | Quoted into AppleScript with Rust escapes | Passed as arguments (unverified: not run on macOS) |
+| Notification app name | `zabterm` | `vogter` |
+| Windows notifications | No Windows build | One toast says they are unsupported; toasts continue |
+| `vogter import` | n/a | Validated copy of a zabterm config, comments kept, mode 0600, never overwrites without `--force` |
 | Late detail for another host or range | Range mismatch shown briefly | Dropped |
-
-## Not yet ported (by milestone)
-
-- M5: Omarchy themes, notifications, `vogter import`, browser opener (`o`).

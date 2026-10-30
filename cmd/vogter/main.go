@@ -11,12 +11,15 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
 	"github.com/knightmare2600/vogter/internal/config"
+	"github.com/knightmare2600/vogter/internal/model"
+	"github.com/knightmare2600/vogter/internal/platform"
 	"github.com/knightmare2600/vogter/internal/poller"
 	"github.com/knightmare2600/vogter/internal/ui"
 	"github.com/knightmare2600/vogter/internal/zabbix"
@@ -43,19 +46,21 @@ Commands:
   init    Write a starter config (default %s)
   check   Validate the config and test the active profile against Zabbix
   config  Print the config file path
+  import  Copy an existing zabterm config into place
 
 Options:
   -p, --profile <NAME>  Profile from the config file to use
   -c, --config <PATH>   Path to an alternative config file
   -t, --theme <THEME>   Override the theme for this run
-      --force           With init: overwrite an existing file
+      --force           With init or import: overwrite an existing file
+      --from <PATH>     With import: the zabterm config (default %s)
   -h, --help            Print help
   -V, --version         Print version
 `
 
 type options struct {
-	profile, configPath, theme string
-	force, help, version       bool
+	profile, configPath, theme, from string
+	force, help, version             bool
 }
 
 func parseArgs(args []string, stderr io.Writer) (options, string, error) {
@@ -78,6 +83,7 @@ func parseArgs(args []string, stderr io.Writer) (options, string, error) {
 		fs.BoolVar(&o.version, n, false, "")
 	}
 	fs.BoolVar(&o.force, "force", false, "")
+	fs.StringVar(&o.from, "from", "", "")
 
 	// Options may come before or after the command.
 	if err := fs.Parse(args); err != nil {
@@ -93,12 +99,15 @@ func parseArgs(args []string, stderr io.Writer) (options, string, error) {
 		}
 	}
 	switch cmd {
-	case "", "init", "check", "config":
+	case "", "init", "check", "config", "import":
 	default:
 		return o, "", fmt.Errorf("unknown command %q", cmd)
 	}
-	if o.force && cmd != "init" {
-		return o, "", errors.New("--force only applies to init")
+	if o.force && cmd != "init" && cmd != "import" {
+		return o, "", errors.New("--force only applies to init and import")
+	}
+	if o.from != "" && cmd != "import" {
+		return o, "", errors.New("--from only applies to import")
 	}
 	return o, cmd, nil
 }
@@ -111,11 +120,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	o, cmd, err := parseArgs(args, stderr)
 	if err != nil {
 		fmt.Fprintf(stderr, "\x1b[31m✕\x1b[0m %v\n\n", err)
-		fmt.Fprintf(stderr, usage, config.DefaultPath())
+		fmt.Fprintf(stderr, usage, config.DefaultPath(), config.ZabtermPath())
 		return 2
 	}
 	if o.help {
-		fmt.Fprintf(stdout, usage, config.DefaultPath())
+		fmt.Fprintf(stdout, usage, config.DefaultPath(), config.ZabtermPath())
 		return 0
 	}
 	if o.version {
@@ -140,6 +149,18 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "check":
 		return check(o, path, stdout, stderr)
+	case "import":
+		from := o.from
+		if from == "" {
+			from = config.ZabtermPath()
+		}
+		names, err := config.Import(from, path, o.force)
+		if err != nil {
+			return fail(stderr, err)
+		}
+		fmt.Fprintf(stdout, "\x1b[32m✓\x1b[0m imported profiles %s from %s\n  into %s\n  run \x1b[1mvogter check\x1b[0m to test them\n",
+			strings.Join(names, ", "), from, path)
+		return 0
 	}
 	return tui(o, path, stderr)
 }
@@ -287,16 +308,23 @@ func tui(o options, path string, stderr io.Writer) int {
 		pl.Run(ctx, cmds, events)
 	}()
 
+	sev, _ := config.ParseSeverity(c.Notifications.MinSeverity)
+	minSev := model.Severity(sev)
 	m := ui.New(ui.Options{
-		Profile:    p.Name,
-		Endpoint:   p.APIURL(),
-		ConfigPath: path,
-		Theme:      themeName,
-		Interval:   interval,
-		Events:     events,
-		Cmds:       cmds,
-		Ack:        pl.Acknowledge,
-		Watch:      pl.Watch,
+		Profile:     p.Name,
+		Endpoint:    p.APIURL(),
+		ConfigPath:  path,
+		Theme:       themeName,
+		Interval:    interval,
+		Events:      events,
+		Cmds:        cmds,
+		Ack:         pl.Acknowledge,
+		Watch:       pl.Watch,
+		WebURL:      p.WebURL(),
+		Desktop:     c.Notifications.Desktop,
+		MinSeverity: minSev,
+		Notify:      platform.Notify,
+		Open:        platform.OpenURL,
 	})
 	_, err = tea.NewProgram(m, colourProfile()...).Run()
 	cancel()

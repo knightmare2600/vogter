@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -13,6 +15,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/knightmare2600/vogter/internal/model"
+	"github.com/knightmare2600/vogter/internal/platform"
 	"github.com/knightmare2600/vogter/internal/poller"
 	"github.com/knightmare2600/vogter/internal/zabbix"
 )
@@ -199,6 +202,7 @@ func TestRefreshSendsOnce(t *testing.T) {
 
 func TestThemeCycle(t *testing.T) {
 	m, _ := newModel(nil)
+	t.Setenv("HOME", t.TempDir())
 	m, _ = press(m, "t")
 	if m.theme.Name != "everforest" {
 		t.Errorf("theme after nord = %q", m.theme.Name)
@@ -701,5 +705,130 @@ func TestHostPageFits(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+func TestNotifications(t *testing.T) {
+	type sent struct {
+		title  string
+		urgent bool
+	}
+	var got []sent
+	m, _ := newModel(nil)
+	m.opts.Desktop = true
+	m.opts.MinSeverity = model.Average
+	m.opts.Notify = func(title, _ string, urgent bool) error {
+		got = append(got, sent{title, urgent})
+		return nil
+	}
+	m = live(m)
+	if len(got) != 0 || len(m.toasts) != 0 {
+		t.Fatalf("the first snapshot announces nothing: %+v", got)
+	}
+	snap := fixture()
+	snap.Problems = append(snap.Problems, model.Problem{EventID: "900", Name: "Disk full", Severity: model.Disaster, Host: "web-01", Clock: testNow.Unix()})
+	for _, repeat := range []int{1, 2} {
+		mm, _ := m.Update(eventMsg{poller.Snapshot{Snapshot: snap}})
+		m = mm.(Model)
+		if len(got) != 1 {
+			t.Fatalf("poll %d: %+v", repeat, got)
+		}
+	}
+	if got[0] != (sent{"Disaster · web-01", true}) {
+		t.Errorf("%+v", got[0])
+	}
+	wants(t, plain(m), "▲ Disaster · web-01", "Disk full")
+
+	m.opts.Desktop = false
+	mm, _ := m.Update(eventMsg{poller.Snapshot{Snapshot: fixture()}})
+	m = mm.(Model)
+	if len(got) != 1 {
+		t.Error("desktop off keeps toasts only")
+	}
+	wants(t, plain(m), "Resolved · web-01")
+}
+
+func TestNotifierMissingOrUnsupported(t *testing.T) {
+	m, _ := newModel(nil)
+	m.opts.Desktop = true
+	m.opts.MinSeverity = model.Average
+	m.opts.Notify = func(string, string, bool) error { return platform.ErrUnsupported }
+	m = live(m)
+	snap := fixture()
+	snap.Problems = append(snap.Problems, model.Problem{EventID: "900", Severity: model.High}, model.Problem{EventID: "901", Severity: model.High})
+	mm, _ := m.Update(eventMsg{poller.Snapshot{Snapshot: snap}})
+	m = mm.(Model)
+	n := 0
+	for _, t := range m.toasts {
+		if t.title == "Desktop notifications" {
+			n++
+		}
+	}
+	if n != 1 {
+		t.Errorf("unsupported notice shown %d times", n)
+	}
+}
+
+func TestOpenInBrowser(t *testing.T) {
+	var opened []string
+	m, _ := newModel(nil)
+	m.opts.WebURL = "https://z"
+	m.opts.Open = func(u string) error { opened = append(opened, u); return nil }
+	m = live(m)
+	m, _ = press(m, "o", "2", "o", "3", "o")
+	m, _ = press(m, "enter", "o")
+	want := []string{
+		"https://z/zabbix.php?action=dashboard.view",
+		"https://z/zabbix.php?action=latest.view&hostids%5B%5D=2",
+		"https://z/zabbix.php?action=problem.view&hostids%5B%5D=2",
+		"https://z/zabbix.php?action=latest.view&hostids%5B%5D=2",
+	}
+	if strings.Join(opened, " ") != strings.Join(want, " ") {
+		t.Errorf("%v", opened)
+	}
+	snap := fixture()
+	snap.Problems[0].HostID = ""
+	mm, _ := m.Update(eventMsg{poller.Snapshot{Snapshot: snap}})
+	m = mm.(Model)
+	m, _ = press(m, "3", "o")
+	if got := opened[len(opened)-1]; got != "https://z/zabbix.php?action=problem.view" {
+		t.Errorf("no host must not build an empty hostids (D21): %s", got)
+	}
+	m.opts.Open = func(string) error { return errors.New("no xdg-open") }
+	m, _ = press(m, "o")
+	wants(t, plain(m), "Could not open browser", "no xdg-open")
+}
+
+func TestThemeLiveReload(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	dir := filepath.Join(home, ".local", "state", "omarchy", "current")
+	if err := os.MkdirAll(filepath.Join(dir, "theme"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	colours := func(name, bg string) {
+		body := fmt.Sprintf("background=%q\nforeground=\"#ffffff\"\nred=\"#ff0000\"\ngreen=\"#00ff00\"\nyellow=\"#ffff00\"\nblue=\"#0000ff\"\nmagenta=\"#ff00ff\"\ncyan=\"#00ffff\"\nmuted=\"#888888\"\n", bg)
+		if err := os.WriteFile(filepath.Join(dir, "theme", "colors.toml"), []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, "theme.name"), []byte(name), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	colours("first", "#111111")
+	m := New(Options{Theme: "auto", Cmds: make(chan poller.Cmd, 1)})
+	m.now = func() time.Time { return testNow }
+	if m.theme.Name != "omarchy:first" {
+		t.Fatalf("%q", m.theme.Name)
+	}
+	colours("second", "#222222")
+	m.frame = 7
+	mm, _ := m.Update(tickMsg(testNow))
+	m = mm.(Model)
+	if m.theme.Name != "omarchy:second" {
+		t.Errorf("theme = %q", m.theme.Name)
+	}
+	if len(m.toasts) != 1 {
+		t.Errorf("toasts = %+v", m.toasts)
 	}
 }

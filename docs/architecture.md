@@ -6,7 +6,9 @@ internal/config     schema, load + validate, paths, credential resolution, Secre
 internal/zabbix     JSON-RPC client (no UI imports), typed methods, error kinds, version support
 internal/model      pure: joins API responses into hosts and problems, filters, sorts, tiles, sparkline buffers
 internal/poller     goroutine owning the client: connect, poll, net/disk budget, seed, coalesce, re-login, logout
-internal/theme      built-in palettes reduced to UI colour roles
+internal/notify     pure diff of two snapshots into announcements
+internal/platform   desktop notifications and browser opening
+internal/theme      built-in palettes and Omarchy themes reduced to UI colour roles
 internal/ui         Bubble Tea model: state, keys, screens, panels, tables, braille chart, toasts, modals
 tools/mockzbx       fixture Zabbix server for development and comparison (not shipped)
 tools/compare.sh    drives a binary under tmux for screen and request comparison

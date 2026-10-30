@@ -59,37 +59,48 @@ token = "` + placeholder + `"
 // force is false.
 var ErrExists = errors.New("already exists")
 
-// WriteTemplate writes Template to path (DefaultPath() when empty) with mode
-// 0600. It never replaces an existing file unless force is set, and it
-// writes to a temporary file first so a failure cannot leave a truncated
-// config behind.
+// WriteTemplate writes Template to path (DefaultPath() when empty). It never
+// replaces an existing file unless force is set.
 func WriteTemplate(path string, force bool) (string, error) {
 	if path == "" {
 		path = DefaultPath()
 	}
-	if _, err := os.Stat(path); err == nil && !force {
-		return path, fmt.Errorf("%s %w (use --force to overwrite)", path, ErrExists)
-	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+	if err := writeNew(path, []byte(Template), force); err != nil {
+		if errors.Is(err, ErrExists) {
+			return path, fmt.Errorf("%s %w (use --force to overwrite)", path, ErrExists)
+		}
 		return path, err
 	}
+	return path, nil
+}
+
+// writeNew writes data with mode 0600 through a temporary file, so a failure
+// cannot leave a truncated file behind. It returns ErrExists rather than
+// replace a file unless force is set.
+func writeNew(path string, data []byte, force bool) error {
+	if _, err := os.Stat(path); err == nil && !force {
+		return ErrExists
+	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-		return path, err
+		return err
 	}
 	tmp, err := os.CreateTemp(filepath.Dir(path), ".config-*.toml")
 	if err != nil {
-		return path, err
+		return err
 	}
 	defer os.Remove(tmp.Name())
 	if err := tmp.Chmod(0o600); err != nil && !errors.Is(err, errors.ErrUnsupported) {
 		tmp.Close()
-		return path, err
+		return err
 	}
-	if _, err := tmp.WriteString(Template); err != nil {
+	if _, err := tmp.Write(data); err != nil {
 		tmp.Close()
-		return path, err
+		return err
 	}
 	if err := tmp.Close(); err != nil {
-		return path, err
+		return err
 	}
-	return path, os.Rename(tmp.Name(), path)
+	return os.Rename(tmp.Name(), path)
 }

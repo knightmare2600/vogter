@@ -284,3 +284,54 @@ func TestExampleMatchesTemplate(t *testing.T) {
 		t.Error("configs/config.example.toml is stale: run make example")
 	}
 }
+
+func TestImport(t *testing.T) {
+	dir := t.TempDir()
+	from := filepath.Join(dir, "zabterm.toml")
+	body := "# my notes\n[profiles.prod]\nurl = \"https://z\"\ntoken_cmd = \"pass show z\"\n[profiles.lab]\nurl = \"https://l\"\n"
+	if err := os.WriteFile(from, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dest := filepath.Join(dir, "vogter", "config.toml")
+	names, err := Import(from, dest, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(names, ",") != "lab,prod" {
+		t.Errorf("%v", names)
+	}
+	got, _ := os.ReadFile(dest)
+	if string(got) != body {
+		t.Error("the text, comments included, must be kept")
+	}
+	if runtime.GOOS != "windows" {
+		if st, _ := os.Stat(dest); st.Mode().Perm() != 0o600 {
+			t.Errorf("mode %o", st.Mode().Perm())
+		}
+	}
+	if err := os.WriteFile(dest, []byte("mine"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Import(from, dest, false); !errors.Is(err, ErrExists) {
+		t.Errorf("err = %v", err)
+	}
+	got, _ = os.ReadFile(dest)
+	if string(got) != "mine" {
+		t.Error("an existing config must not be replaced without --force")
+	}
+	if _, err := Import(from, dest, true); err != nil {
+		t.Errorf("forced: %v", err)
+	}
+	for name, bad := range map[string]string{"parse": "[x", "empty": "theme = \"nord\"\n", "no url": "[profiles.a]\ntoken = \"t\"\n"} {
+		p := filepath.Join(dir, name+".toml")
+		if err := os.WriteFile(p, []byte(bad), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Import(p, filepath.Join(dir, name+"-out.toml"), false); err == nil {
+			t.Errorf("%s: accepted", name)
+		}
+	}
+	if _, err := Import(filepath.Join(dir, "missing"), dest, true); err == nil {
+		t.Error("missing source accepted")
+	}
+}

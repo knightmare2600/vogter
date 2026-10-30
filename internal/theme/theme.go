@@ -1,12 +1,13 @@
 // Package theme holds the built-in palettes and reduces each one to the
 // colour roles the UI paints with. Values and role formulas are those of
-// zabterm (src/theme.rs). Omarchy integration arrives in Milestone 5.
+// zabterm (src/theme.rs).
 package theme
 
 import (
 	"fmt"
 	"image/color"
 	"math"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -83,9 +84,17 @@ type Theme struct {
 	Series                [6]color.Color
 }
 
-// Load returns the named built-in theme. "auto", "omarchy" and unknown
-// names fall back to tokyo-night until Omarchy support lands.
+// Follows reports whether a theme name tracks Omarchy.
+func Follows(name string) bool { return name == "auto" || name == "omarchy" }
+
+// Load returns a theme. "auto" and "omarchy" read the active Omarchy theme,
+// and they and unknown names fall back to tokyo-night.
 func Load(name string) Theme {
+	if Follows(name) {
+		if n, p, ok := loadOmarchy(); ok {
+			return FromPalette("omarchy:"+n, p)
+		}
+	}
 	p, ok := builtins[name]
 	if !ok {
 		name = "tokyo-night"
@@ -120,12 +129,18 @@ func FromPalette(name string, p Palette) Theme {
 	}
 }
 
-// Next returns the theme after current in cycling order.
+// Next returns the theme after current in cycling order, which starts with
+// "auto" when Omarchy is present.
 func Next(current string) string {
-	for i, n := range Builtin {
-		if n == current {
-			return Builtin[(i+1)%len(Builtin)]
-		}
+	names := slices.Clone(Builtin)
+	if OmarchyPresent() {
+		names = append([]string{"auto"}, names...)
 	}
-	return Builtin[0]
+	if strings.HasPrefix(current, "omarchy:") {
+		current = "auto"
+	}
+	if i := slices.Index(names, current); i >= 0 {
+		return names[(i+1)%len(names)]
+	}
+	return names[0]
 }

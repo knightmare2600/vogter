@@ -5,9 +5,8 @@ A keyboard-driven terminal UI for Zabbix, written in Go.
 Vogter is an independent port of [zabterm](https://github.com/enderkus/zabterm) by Ender KUŞ. It is not
 affiliated with, or endorsed by, the zabterm author. See `NOTICE` and `LICENSE`.
 
-**Status: Milestone 4 of 6.** The dashboard, hosts, problems and host pages work, including filters,
-sorting, acknowledging, latest data and graphs. Omarchy themes, notifications and the browser opener arrive
-in Milestone 5.
+**Status: Milestone 5 of 6.** Every zabterm feature is ported. Only Linux has been run so far, and only
+against a fixture server: see `docs/compatibility.md`.
 
 ## Build
 
@@ -32,6 +31,8 @@ Without a config file:
 ```sh
 VOGTER_URL=https://zabbix.example.com VOGTER_TOKEN=... bin/vogter
 ```
+
+Coming from zabterm? `bin/vogter import` copies your config across.
 
 Options: `-p NAME` picks a profile, `-c PATH` uses another config file, `-t THEME` overrides the theme.
 
