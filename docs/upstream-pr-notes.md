@@ -1,0 +1,21 @@
+# Notes for upstream zabterm pull requests
+
+Defects found while porting, fixed in Vogter, to offer upstream as PRs at the end of the port. Locations
+refer to zabterm commit `d57c642`. Nothing has been submitted yet.
+
+| ID | Status in Vogter | Upstream location | Problem | Reproduction | Proposed Rust change |
+|---|---|---|---|---|---|
+| D1 | Fixed (M2) | `app.rs:160` + `worker.rs:50-56` | Two full polls at start-up: `App::new` sends `Cmd::Refresh` and the first `interval.tick()` fires immediately | Run against any server and log requests: two `host.get` within ~1 ms | Drop `app.send(Cmd::Refresh)` from `App::new`, or call `ticker.tick().await` once before the loop |
+| D3 | Fixed (M2) | `api.rs:28-35`, `worker.rs:88-93`, `main.rs:126` | `user.login` sessions are never closed; each run and each re-login leaves a session behind (the Zabbix manual asks for `user.logout`) | `username`/`password` profile; start and quit; no `user.logout` request | Track whether the token is a session; call `user.logout` with `[]` on quit and before replacing the client |
+| D14 | Fixed (M2) | `config.rs:124-130` | An empty `ZABTERM_TOKEN` or empty `token_env` variable is accepted as a token, giving a confusing auth error later | `ZABTERM_TOKEN= zabterm check` with a valid `token` in the file: fails with "Not authorized" | Treat empty values as unset (`Ok(t) if !t.is_empty()`) |
+| D15 | Fixed (M2) | `main.rs:59-60`, `config.rs:202-203` | `zabterm -c other.toml init` writes the default path, not `other.toml` | Run it; `other.toml` is not created | Pass the resolved `config_path` into `write_template` |
+| D16 | Fixed (M2) | `ui/mod.rs:149` | Footer shows the configured interval although the worker raises values below 2 to 2 | `refresh_interval = 1`; footer says "every 1s" | Clamp in `Config::load` instead of `worker::spawn` |
+| D17 | Partly fixed (M2: warnings) | `config.rs:58-99`, `theme.rs:192-203`, `app.rs:123` | Unknown keys, theme names and severity names are silently ignored or defaulted | `theme = "gruvbx"` gives tokyo-night with no message | Have `check` report them, for example with `serde_ignored` or a second pass over `toml::Table` |
+| D18 | Fixed (M2) | `worker.rs:88-93` | Re-login decided by substring match on any error text, including transport errors that mention "session" | Hard to trigger. Seen by reading the code | Match the JSON-RPC error data from `call()` explicitly |
+| D6 | Fixed (M3) | `worker.rs:175-180` | A failed seed `history.get` is swallowed but the items are marked seeded, so they are never retried | Fail the first `history.get`; sparklines stay empty until the window fills | Extend `series.seeded` only when the call succeeded |
+| D7 | Fixed (M3) | `worker.rs:175` | Seed history always asks for `history:0`, so a type 3 CPU or memory item gets no seed | Serve `system.cpu.util` with `value_type` 3 | Group unseeded items by `value_type`, as `host_detail` already does |
+| D9 | Fixed (M3) | `api.rs:90`, `dashboard.rs` | Counts silently cap at `limit:500` | More than 500 active problems | Flag a full page and show `500+` |
+| D19 | Fixed (M3) | `worker.rs:114-134` | Sparkline buffers are never dropped for removed items | Delete items during a long run; memory grows slowly | `retain` the maps against the current item ids |
+| D20 | Fixed (M3) | `worker.rs:53-96` | One command at a time, so an acknowledge waits behind a slow poll | Slow server, press `a` then `⏎` during a poll | Spawn `acknowledge` as its own task; `Client` is already shared by reference |
+
+Later milestones add D2, D4, D5, D8, D10–D13 and D21 as they are fixed.
