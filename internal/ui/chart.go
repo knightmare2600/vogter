@@ -220,7 +220,7 @@ func timeChart(t *theme.Theme, w, h int, o panelOpts, series []chartSeries, x0, 
 		lines = append(lines, b.String())
 	}
 	lines = append(lines, strings.Repeat(" ", lw)+axis.Render("└"+strings.Repeat("─", plotW)))
-	left, mid, right := fmtHHMM(x0), fmtHHMM((x0+x1)/2), "now"
+	left, mid, right := fmtAxisTime(x0, x1-x0), fmtAxisTime((x0+x1)/2, x1-x0), "now"
 	row := []rune(strings.Repeat(" ", innerW))
 	copy(row, []rune(left))
 	copy(row[max(lw+1+plotW/2-len(mid)/2, 0):], []rune(mid))

@@ -80,11 +80,22 @@ or Homebrew tap. Release archives hold the binary, licences and a `.desktop` fil
 `.github/workflows/ci.yml` runs the tests on Linux, macOS and Windows once the repository is on GitHub. It
 has not run yet, and CI does not exercise a real terminal.
 
+## Verified against a real server
+
+Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`:
+
+- `vogter check` with `token_cmd` and username/password; a bad token, bad password and wrong URL each gave the right hint.
+- `go test -tags live ./internal/integration` passed.
+- Dashboard, hosts, problems, latest data, acknowledge, and graphs at 1h, 24h and 7d (trends).
+- Discovered `net.if` and `vfs.fs.dependent.size` keys, including a real ext4-backed `/data` mount in the filesystems
+  panel. The agent's `/etc/*` container mounts were excluded as designed.
+- An expired password session: one poll showed offline, then Vogter logged in again unaided.
+- Real wording of authentication and permission errors, from `host.get`, `user.login`, `event.acknowledge` and
+  `host.create`, is classified correctly.
+
 ## Not verified
 
-- No run against a real Zabbix server. `go test -tags live ./internal/integration` does one, read-only, when
-  given `VOGTER_LIVE_URL` and `VOGTER_LIVE_TOKEN`.
-- Real Zabbix error wording for an expired session or a permission failure. Vogter matches known phrases,
-  so an unknown wording shows as a plain API error, and a session might not re-login until restart.
+- Zabbix 6.4 and 8.0 have not run against a real server.
+- Desktop notifications driven by a real server; they were tested on the mock.
 - Omarchy 4 support is tested against files in its v4.0.6 format, not on an Omarchy machine.
 - `osascript` argument passing has not run on macOS.

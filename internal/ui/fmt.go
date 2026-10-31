@@ -61,7 +61,14 @@ func fmtClock(ts int64, now time.Time) string {
 	return t.Format("Jan 02 15:04")
 }
 
-func fmtHHMM(ts float64) string { return time.Unix(int64(ts), 0).Format("15:04") }
+// fmtAxisTime labels a chart's time axis. Beyond two days a bare clock time
+// no longer says which day it means, so the date replaces it.
+func fmtAxisTime(ts, span float64) string {
+	if span > 2*86400 {
+		return time.Unix(int64(ts), 0).Format("Jan 02")
+	}
+	return time.Unix(int64(ts), 0).Format("15:04")
+}
 
 func fmtPct(m model.Metric) string {
 	switch {

@@ -260,7 +260,7 @@ func failAPI(w io.Writer, err error) int {
 		zabbix.KindTransport:  "cannot reach the server: check url, DNS, firewall and certificates",
 		zabbix.KindHTTP:       "the web server answered with an error: check url points at the Zabbix frontend",
 		zabbix.KindDecode:     "the response is not the Zabbix API: check url points at the Zabbix frontend",
-		zabbix.KindAuth:       "credentials rejected: the token may be expired, revoked or disabled",
+		zabbix.KindAuth:       "credentials rejected: check the username and password, or that the token is valid and enabled",
 		zabbix.KindPermission: "the account lacks permission for this call",
 		zabbix.KindShape:      "unexpected response from Zabbix: please report your Zabbix version",
 	}[zabbix.KindOf(err)]

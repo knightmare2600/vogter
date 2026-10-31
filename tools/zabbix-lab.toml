@@ -1,0 +1,13 @@
+# Vogter config for the throwaway lab in tools/zabbix-lab.sh. These are the
+# stock Zabbix credentials of a local container, not a secret.
+default_profile = "lab"
+theme = "auto"
+refresh_interval = 5
+
+[notifications]
+desktop = false
+
+[profiles.lab]
+url = "http://127.0.0.1:18080"
+username = "Admin"
+password = "zabbix"

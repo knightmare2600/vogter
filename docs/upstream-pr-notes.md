@@ -23,5 +23,6 @@ refer to zabterm commit `d57c642`. Nothing has been submitted yet.
 | D10 | Fixed (M5) | `app.rs:237-241` | Past `limit:500`, a problem pushed off the page is announced as resolved | More than 500 problems, a newer one arrives | Skip resolve notes when either snapshot holds a full page |
 | D11 | Fixed (M5, unverified on macOS) | `app.rs:607` | AppleScript text is built with Rust `{:?}`, which can emit `\\u{...}` escapes AppleScript does not know | Problem name with an emoji or control character | Pass the text as `osascript` arguments and read it from `argv` |
 | D21 | Fixed (M5) | `app.rs:590-593` | `o` on a problem with no host builds an empty `hostids[]=` | Problem whose trigger has no host | Fall back to `problem.view` |
+| D22 | Fixed (live test) | `ui/fmt.rs:50` | Chart time axis shows only HH:MM, so the 7d graph's labels do not say which day they mean | Open a host graph at the 7d range | Show the date on ranges beyond two days |
 
 D8 (multi-host triggers), D12 and D13 are kept as they are; see `porting-audit.md` §13.

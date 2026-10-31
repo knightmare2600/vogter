@@ -227,3 +227,13 @@ func TestSplit(t *testing.T) {
 		t.Errorf("%v", got)
 	}
 }
+
+func TestFmtAxisTime(t *testing.T) {
+	ts := float64(time.Date(2026, 10, 24, 11, 3, 0, 0, time.Local).Unix())
+	if got := fmtAxisTime(ts, 24*3600); got != "11:03" {
+		t.Errorf("24h: %q", got)
+	}
+	if got := fmtAxisTime(ts, 7*24*3600); got != "Oct 24" {
+		t.Errorf("7d: %q", got)
+	}
+}
