@@ -124,6 +124,9 @@ Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`
 ## Not verified
 
 - Zabbix 6.4 and 8.0 have not run against a real server, including `4 Boards`.
+- Linux arm64, armv7, armel, ppc64, mipsel and mips64el pass the full test suite and run against the mock server under
+  QEMU, not on real hardware. macOS arm64 passes the tests on GitHub's runner. The macOS and Windows binaries have not
+  been launched, and Windows arm64 has not run at all, including its tests.
 - `svggraph` datasets that list item ids rather than patterns: unit-tested only, as the default dashboards use patterns.
 - `tophosts` matches items by name, tested with one host. The lab's fed hosts use different item names.
 - `dashboard.get` on an account with a large number of dashboards.

@@ -1,7 +1,11 @@
 # Notes for upstream zabterm pull requests
 
 Defects found while porting, fixed in Vægter, to offer upstream as PRs at the end of the port. Locations
-refer to zabterm commit `d57c642`. Nothing has been submitted yet.
+refer to zabterm commit `d57c642`.
+
+Submitted on 2026-10-31: D1 ([#2](https://github.com/enderkus/zabterm/pull/2)), D14
+([#3](https://github.com/enderkus/zabterm/pull/3)), D15 ([#4](https://github.com/enderkus/zabterm/pull/4)) and D16
+([#5](https://github.com/enderkus/zabterm/pull/5)). Nothing else has been submitted.
 
 | ID | Status in Vægter | Upstream location | Problem | Reproduction | Proposed Rust change |
 |---|---|---|---|---|---|

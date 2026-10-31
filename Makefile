@@ -4,7 +4,9 @@ export GOTOOLCHAIN := local
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
 BIN     := bin/vaegter
-TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
+# Names, not Go values: armv7, armel, mipsel and mips64el are mapped in `cross`.
+TARGETS := linux/amd64 linux/arm64 linux/armv7 linux/armel linux/ppc64 linux/mipsel linux/mips64el \
+           darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
 
 .PHONY: all build check fmt vet test race example cross dist notices clean
 
@@ -37,8 +39,15 @@ example: build
 cross:
 	@for t in $(TARGETS); do \
 	  os=$${t%/*}; arch=$${t#*/}; ext=; [ $$os = windows ] && ext=.exe; \
+	  goarch=$$arch; goarm=; gomips=; gomips64=; \
+	  case $$arch in \
+	    armv7) goarch=arm; goarm=7;; \
+	    armel) goarch=arm; goarm=5;; \
+	    mipsel) goarch=mipsle; gomips=softfloat;; \
+	    mips64el) goarch=mips64le; gomips64=softfloat;; \
+	  esac; \
 	  echo "building $$os/$$arch"; \
-	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags '$(LDFLAGS)' \
+	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$goarch GOARM=$$goarm GOMIPS=$$gomips GOMIPS64=$$gomips64 go build -trimpath -ldflags '$(LDFLAGS)' \
 	    -o dist/vaegter-$(VERSION)-$$os-$$arch$$ext ./cmd/vaegter || exit 1; \
 	done
 

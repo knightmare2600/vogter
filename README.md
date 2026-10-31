@@ -39,6 +39,9 @@ for.
 | Run against real Zabbix 7.0.32 in a test lab | ✅ | ❌ not yet tested | ❌ not yet tested |
 | Run against a production Zabbix server | ❌ not yet tested | ❌ not yet tested | ❌ not yet tested |
 
+Releases cover Linux on amd64, arm64, armv7, armel, ppc64, mipsel and mips64el, macOS on amd64 and arm64, and Windows
+on amd64 and arm64. The Linux builds beyond amd64 pass the tests and run under QEMU, not yet on real hardware.
+
 Every zabterm feature is ported. See `docs/compatibility.md` for what has been verified, what has not, and how Vægter
 differs from zabterm.
 
