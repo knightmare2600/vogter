@@ -143,7 +143,7 @@ func Load(path string) (*Config, []Issue, error) {
 		c.DefaultProfile = "env"
 	}
 	if len(c.Profiles) == 0 {
-		return nil, issues, fmt.Errorf("%w.\n\n  Run `vaegter init` to write a starter config to %s\n  or export %s and %s",
+		return nil, issues, fmt.Errorf("%w.\n\n  Run `vaegter setup` to connect a server, `vaegter init` to write a starter config to %s,\n  or export %s and %s",
 			ErrNoProfiles, path, EnvURL, EnvToken)
 	}
 	issues = append(issues, c.validate()...)

@@ -81,6 +81,14 @@ licences and a `.desktop` file.
 `.github/workflows/ci.yml` runs the tests on Linux, macOS and Windows once the repository is on GitHub. It
 has not run yet, and CI does not exercise a real terminal.
 
+## Welcome screen
+
+zabterm has no equivalent. With no config, `vaegter` opens a welcome screen in a terminal, and `vaegter setup` reruns
+it. Scripts and services still get the "no profiles configured" error, as they are not at a terminal. It calls
+`user.login`, `token.create`, `token.generate`, `host.get` to test the token, and `user.logout`. A failure after creating
+a token calls `token.delete`. These are the only calls Vægter makes that change anything on the server besides
+`event.acknowledge`. Tokens are created without an expiry; revoke one under User settings → API tokens.
+
 ## Scrollbars and mouse
 
 Vægter adds a scrollbar to any table that overflows; a table that fits looks as it does in zabterm. The mouse wheel is
@@ -117,6 +125,8 @@ Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`
 - Discovered `net.if` and `vfs.fs.dependent.size` keys, including a real ext4-backed `/data` mount in the filesystems
   panel. The agent's `/etc/*` container mounts were excluded as designed.
 - `4 Boards` on the stock `Global view`, `Zabbix server health` and `Zabbix server` dashboards, at 150×45 and 80×24, including scrolling both ways.
+- The welcome screen, with a wrong password, an account denied `token.create`, a rejected and a valid pasted token,
+  a second run on an existing config, and at 80×24 in ASCII mode.
 - An expired password session: one poll showed offline, then Vægter logged in again unaided.
 - Real wording of authentication and permission errors, from `host.get`, `user.login`, `event.acknowledge` and
   `host.create`, is classified correctly.
@@ -129,6 +139,7 @@ Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`
   been launched, and Windows arm64 has not run at all, including its tests.
 - `svggraph` datasets that list item ids rather than patterns: unit-tested only, as the default dashboards use patterns.
 - `tophosts` matches items by name, tested with one host. The lab's fed hosts use different item names.
+- The welcome screen against SSO, LDAP or MFA accounts, and against a server with a real TLS certificate problem.
 - `dashboard.get` on an account with a large number of dashboards.
 - Desktop notifications driven by a real server; they were tested on the mock.
 - Omarchy 4 support is tested against files in its v4.0.6 format, not on an Omarchy machine.

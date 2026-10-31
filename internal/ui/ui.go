@@ -1079,8 +1079,8 @@ var logo = [6][3]string{
 	{"█▀▄", "█▀▄", "▀ ▀"},
 }
 
-func (m Model) splash() string {
-	t := &m.theme
+// logoLines renders the logo and its tagline.
+func logoLines(t *theme.Theme) []string {
 	var lines []string
 	for row := 0; row < 3; row++ {
 		var b strings.Builder
@@ -1093,7 +1093,12 @@ func (m Model) splash() string {
 		}
 		lines = append(lines, b.String())
 	}
-	lines = append(lines, "", fg(t.Muted).Render("a terminal for Zabbix"), "")
+	return append(lines, "", fg(t.Muted).Render("a terminal for Zabbix"), "")
+}
+
+func (m Model) splash() string {
+	t := &m.theme
+	lines := logoLines(t)
 	if m.err != "" {
 		lines = append(lines,
 			fg(t.Err).Render("✕  "+truncate(m.err, max(m.width-8, 20))),

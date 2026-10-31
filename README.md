@@ -28,8 +28,8 @@ the usual ASCII spelling of æ.
 The old job survives in [Ebeltoft](https://www.visitaarhus.com/aarhus/planlegg-reisen/nightwatchmen-old-ebeltoft-gdk606173):
 watchmen are recorded there from the late 1600s, and they once patrolled every hour, calling out the time. These days
 they set off from the Old Town Hall on summer evenings and stop at restaurants to sing. Vægter patrols every 10 seconds
-by default and, sadly, does not sing. It only reads, too: its one change to Zabbix data is an acknowledgement you ask
-for.
+by default and, sadly, does not sing. It mostly just watches, too: the only changes it makes to Zabbix are an
+acknowledgement you ask for and the API token it creates when you connect a server.
 
 ## Status
 
@@ -58,11 +58,17 @@ make dist       # release binaries and archives, with SHA256SUMS
 ## Use
 
 ```sh
-bin/vaegter init      # writes ~/.config/vogter/config.toml (mode 600)
-vim ~/.config/vogter/config.toml
+bin/vaegter           # first run: a welcome screen connects your server
+bin/vaegter setup     # connect another server at any time
 bin/vaegter check     # validates the config and tests the server
-bin/vaegter           # start the UI; ? for keys, q to quit
 ```
+
+The welcome screen asks for your Zabbix address and login, creates an API token named `vaegter-<hostname>` on your
+account, tests it and saves it to `~/.config/vogter/config.toml` (mode 600). Your password is used once and never stored,
+and the session is closed afterwards. If your account uses MFA or may not create tokens, press `tab` to paste a token
+from User settings → API tokens.
+
+Prefer to write the config by hand? `bin/vaegter init` writes a commented starter file.
 
 Without a config file:
 

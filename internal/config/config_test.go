@@ -341,3 +341,96 @@ func TestMouseDefaultsOff(t *testing.T) {
 		t.Error("the mouse must stay off unless asked for")
 	}
 }
+
+func TestSaveFirstProfile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sub", "config.toml")
+	name, err := SaveProfile(path, "https://zabbix.example.com", "secret-token", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "zabbix" {
+		t.Errorf("name %q", name)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Errorf("mode %v", info.Mode().Perm())
+	}
+	c, issues, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(issues) != 0 {
+		t.Errorf("%v", issues)
+	}
+	p, err := c.Profile("")
+	if err != nil || p.Name != name || p.URL != "https://zabbix.example.com" || p.Token.Reveal() != "secret-token" {
+		t.Fatalf("%+v %v", p, err)
+	}
+	raw, _ := os.ReadFile(path)
+	if !strings.Contains(string(raw), "# Self-signed certificate") || strings.Contains(string(raw), placeholder) {
+		t.Error("the commented template must stay, without its placeholder")
+	}
+}
+
+func TestSaveProfileKeepsAnExistingConfig(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	original := "# my note\ndefault_profile = \"zabbix\"\n\n[profiles.zabbix]\nurl = \"https://a.example\"\ntoken = \"old\"\n"
+	if err := os.WriteFile(path, []byte(original), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	name, err := SaveProfile(path, "https://zabbix.other.example", "new", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "zabbix-2" {
+		t.Errorf("name %q", name)
+	}
+	raw, _ := os.ReadFile(path)
+	if !strings.HasPrefix(string(raw), original) {
+		t.Errorf("existing text changed:\n%s", raw)
+	}
+	c, _, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.DefaultProfile != "zabbix" || c.Profiles[name].TLSVerify() {
+		t.Errorf("%+v", c.Profiles[name])
+	}
+}
+
+func TestSaveProfileReplacesAnUnfilledDefault(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if _, err := WriteTemplate(path, false); err != nil {
+		t.Fatal(err)
+	}
+	name, err := SaveProfile(path, "http://10.0.0.5:8080", "tok", true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if name != "10-0-0-5" {
+		t.Errorf("an IP address must not be cut at its first dot: %q", name)
+	}
+	c, _, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.DefaultProfile != name {
+		t.Errorf("default %q", c.DefaultProfile)
+	}
+}
+
+func TestSaveProfileRefusesABrokenFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	if err := os.WriteFile(path, []byte("[broken"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := SaveProfile(path, "https://a.example", "t", true); err == nil {
+		t.Fatal("want a parse error")
+	}
+	if raw, _ := os.ReadFile(path); string(raw) != "[broken" {
+		t.Error("a config that does not parse must be left alone")
+	}
+}

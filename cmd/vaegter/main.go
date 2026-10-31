@@ -16,10 +16,12 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
+	"github.com/charmbracelet/x/term"
 
 	"github.com/knightmare2600/vogter"
 	"github.com/knightmare2600/vogter/internal/config"
 	"github.com/knightmare2600/vogter/internal/model"
+	"github.com/knightmare2600/vogter/internal/onboard"
 	"github.com/knightmare2600/vogter/internal/platform"
 	"github.com/knightmare2600/vogter/internal/poller"
 	"github.com/knightmare2600/vogter/internal/ui"
@@ -44,7 +46,8 @@ const usage = `Vægter: a terminal UI for Zabbix
 Usage: vaegter [OPTIONS] [COMMAND]
 
 Commands:
-  init      Write a starter config (default %s)
+  setup     Connect a Zabbix server: signs in and creates an API token for you
+  init      Write a starter config by hand (default %s)
   check     Validate the config and test the active profile against Zabbix
   config    Print the config file path
   import    Copy an existing zabterm config into place
@@ -101,7 +104,7 @@ func parseArgs(args []string, stderr io.Writer) (options, string, error) {
 		}
 	}
 	switch cmd {
-	case "", "init", "check", "config", "import", "licences":
+	case "", "init", "check", "config", "import", "licences", "setup":
 	case "licenses":
 		cmd = "licences"
 	default:
@@ -157,6 +160,19 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	case "check":
 		return check(o, path, stdout, stderr)
+	case "setup":
+		if !interactive() {
+			return fail(stderr, errors.New("setup needs a terminal"))
+		}
+		name, err := runSetup(o, path)
+		if err != nil {
+			return fail(stderr, err)
+		}
+		if name == "" {
+			return 0
+		}
+		o.profile = name
+		return tui(o, path, stderr)
 	case "import":
 		from := o.from
 		if from == "" {
@@ -297,8 +313,41 @@ func colourProfile() []tea.ProgramOption {
 	return nil
 }
 
+// interactive reports whether a person is at the terminal, so that a welcome
+// flow can never hang a script or a service.
+func interactive() bool {
+	return term.IsTerminal(os.Stdin.Fd()) && term.IsTerminal(os.Stdout.Fd())
+}
+
+// runSetup runs the welcome flow and returns the saved profile, or "" when
+// the user left without finishing.
+func runSetup(o options, path string) (string, error) {
+	themeName := "auto"
+	if o.theme != "" {
+		themeName = o.theme
+	}
+	backend := onboard.New(path, "vaegter/"+appVersion())
+	final, err := tea.NewProgram(ui.NewSetup(backend, path, themeName, asciiMode()), colourProfile()...).Run()
+	if err != nil {
+		return "", err
+	}
+	return final.(ui.SetupModel).Profile(), nil
+}
+
 func tui(o options, path string, stderr io.Writer) int {
 	c, p, err := loadProfile(o, path, stderr, false)
+	// With nothing configured, a person gets the welcome flow, not an error.
+	if errors.Is(err, config.ErrNoProfiles) && interactive() {
+		name, serr := runSetup(o, path)
+		if serr != nil {
+			return fail(stderr, serr)
+		}
+		if name == "" {
+			return 0
+		}
+		o.profile = name
+		c, p, err = loadProfile(o, path, stderr, false)
+	}
 	if err != nil {
 		return fail(stderr, err)
 	}

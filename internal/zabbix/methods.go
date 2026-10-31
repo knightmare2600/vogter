@@ -1,6 +1,9 @@
 package zabbix
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // Request parameters match zabterm 0.1.2 as captured in porting-audit §6.2.
 
@@ -154,6 +157,41 @@ func (c *Client) Dashboards(ctx context.Context) ([]Dashboard, error) {
 		"sortfield":   "name",
 	}, &out)
 	return only(out, err)
+}
+
+// CreateToken creates an API token for the logged-in user and returns its id.
+// The secret comes from GenerateToken.
+func (c *Client) CreateToken(ctx context.Context, name string) (string, error) {
+	var out struct {
+		TokenIDs []string `json:"tokenids"`
+	}
+	if err := c.Call(ctx, "token.create", map[string]any{"name": name}, &out); err != nil {
+		return "", err
+	}
+	if len(out.TokenIDs) != 1 || out.TokenIDs[0] == "" {
+		return "", &Error{Kind: KindShape, Method: "token.create", Err: errors.New("no token id returned")}
+	}
+	return out.TokenIDs[0], nil
+}
+
+// GenerateToken returns the secret of a token. Zabbix shows it only here, and
+// generating it again replaces the previous secret.
+func (c *Client) GenerateToken(ctx context.Context, tokenID string) (string, error) {
+	var out []struct {
+		Token string `json:"token"`
+	}
+	if err := c.Call(ctx, "token.generate", []string{tokenID}, &out); err != nil {
+		return "", err
+	}
+	if len(out) != 1 || out[0].Token == "" {
+		return "", &Error{Kind: KindShape, Method: "token.generate", Err: errors.New("no token returned")}
+	}
+	return out[0].Token, nil
+}
+
+// DeleteToken removes a token.
+func (c *Client) DeleteToken(ctx context.Context, tokenID string) error {
+	return c.Call(ctx, "token.delete", []string{tokenID}, nil)
 }
 
 // Count runs a counting get on method, such as template.get.
