@@ -150,6 +150,9 @@ func TestWatchLoop(t *testing.T) {
 	if d := waitFor("poller.Detail").(Detail); d.HostID != "1" || d.Range != 3600 {
 		t.Errorf("%+v", d)
 	}
+	// The first poll's poke can land beside Watch's; let it finish, so the
+	// count below is of one poll alone.
+	time.Sleep(100 * time.Millisecond)
 	before := api.count("hostitems")
 	cmds <- Refresh
 	waitFor("poller.Snapshot")

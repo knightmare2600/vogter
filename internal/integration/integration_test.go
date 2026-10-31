@@ -122,7 +122,8 @@ func TestFullStack(t *testing.T) {
 	if s.count("user.logout") != 1 {
 		t.Errorf("logouts = %d", s.count("user.logout"))
 	}
-	if s.count("event.acknowledge") != 1 || s.count("trend.get") != 1 {
+	// The poll's own poke can land beside Watch's, so the detail may fetch twice.
+	if s.count("event.acknowledge") != 1 || s.count("trend.get") < 1 {
 		t.Errorf("%v", s.calls)
 	}
 }

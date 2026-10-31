@@ -58,7 +58,7 @@ func roundHalfAway(f float64) float64 {
 }
 
 func TestLoadFallbackAndCycle(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	if Load("auto").Name != "tokyo-night" || Load("nonsense").Name != "tokyo-night" {
 		t.Error("unknown themes must fall back to tokyo-night")
 	}
@@ -142,7 +142,7 @@ func TestParseThemeFiles(t *testing.T) {
 func installTheme(t *testing.T, dir string, files map[string]string) string {
 	t.Helper()
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	themeDir := filepath.Join(home, filepath.FromSlash(dir), "theme")
 	if err := os.MkdirAll(themeDir, 0o700); err != nil {
 		t.Fatal(err)
@@ -183,7 +183,7 @@ func TestAutoOmarchy3(t *testing.T) {
 }
 
 func TestAutoWithoutOmarchy(t *testing.T) {
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	if Load("auto").Name != "tokyo-night" {
 		t.Error("no Omarchy means tokyo-night")
 	}
@@ -211,4 +211,12 @@ func TestSignatureChanges(t *testing.T) {
 	if OmarchySignature() == a {
 		t.Error("a theme switch must change the signature")
 	}
+}
+
+// setHome points the home directory at dir on every platform; Windows reads
+// USERPROFILE, not HOME.
+func setHome(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
 }

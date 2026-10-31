@@ -206,7 +206,7 @@ func TestRefreshSendsOnce(t *testing.T) {
 
 func TestThemeCycle(t *testing.T) {
 	m, _ := newModel(nil)
-	t.Setenv("HOME", t.TempDir())
+	setHome(t, t.TempDir())
 	m, _ = press(m, "t")
 	if m.theme.Name != "everforest" {
 		t.Errorf("theme after nord = %q", m.theme.Name)
@@ -805,7 +805,7 @@ func TestOpenInBrowser(t *testing.T) {
 
 func TestThemeLiveReload(t *testing.T) {
 	home := t.TempDir()
-	t.Setenv("HOME", home)
+	setHome(t, home)
 	dir := filepath.Join(home, ".local", "state", "omarchy", "current")
 	if err := os.MkdirAll(filepath.Join(dir, "theme"), 0o700); err != nil {
 		t.Fatal(err)
@@ -854,4 +854,12 @@ func TestASCIIFallback(t *testing.T) {
 			}
 		}
 	}
+}
+
+// setHome points the home directory at dir on every platform; Windows reads
+// USERPROFILE, not HOME.
+func setHome(t *testing.T, dir string) {
+	t.Helper()
+	t.Setenv("HOME", dir)
+	t.Setenv("USERPROFILE", dir)
 }
