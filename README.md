@@ -3,6 +3,8 @@
 A keyboard-driven terminal UI for **Zabbix**, written in Go: hosts, problems, acknowledgements, graphs and your own
 Zabbix dashboards, in a single static binary, with no browser in the loop.
 
+![Vægter dashboard showing hosts, problems by severity, a fleet CPU graph and a host table](screenshot.png)
+
 Vægter is an independent port of [zabterm](https://github.com/enderkus/zabterm) by Ender KUŞ. It is not
 affiliated with, or endorsed by, the zabterm author. See `NOTICE` and `LICENSE`.
 
