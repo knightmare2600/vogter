@@ -17,6 +17,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/charmbracelet/colorprofile"
 
+	"github.com/knightmare2600/vogter"
 	"github.com/knightmare2600/vogter/internal/config"
 	"github.com/knightmare2600/vogter/internal/model"
 	"github.com/knightmare2600/vogter/internal/platform"
@@ -43,10 +44,11 @@ const usage = `vogter: a terminal UI for Zabbix
 Usage: vogter [OPTIONS] [COMMAND]
 
 Commands:
-  init    Write a starter config (default %s)
-  check   Validate the config and test the active profile against Zabbix
-  config  Print the config file path
-  import  Copy an existing zabterm config into place
+  init      Write a starter config (default %s)
+  check     Validate the config and test the active profile against Zabbix
+  config    Print the config file path
+  import    Copy an existing zabterm config into place
+  licences  Print Vogter's licence and those of the code it includes
 
 Options:
   -p, --profile <NAME>  Profile from the config file to use
@@ -99,7 +101,9 @@ func parseArgs(args []string, stderr io.Writer) (options, string, error) {
 		}
 	}
 	switch cmd {
-	case "", "init", "check", "config", "import":
+	case "", "init", "check", "config", "import", "licences":
+	case "licenses":
+		cmd = "licences"
 	default:
 		return o, "", fmt.Errorf("unknown command %q", cmd)
 	}
@@ -129,6 +133,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	if o.version {
 		fmt.Fprintln(stdout, "vogter", appVersion())
+		return 0
+	}
+	if cmd == "licences" {
+		fmt.Fprint(stdout, strings.Join(vogter.LicenceFiles, "\n"))
 		return 0
 	}
 	path := o.configPath

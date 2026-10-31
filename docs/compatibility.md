@@ -66,7 +66,8 @@ notifications with the same urgency.
 ## Parity with the audit checklist
 
 Every row of the checklist in `porting-audit.md` §5 is implemented, apart from Z1. There is no `install.sh`
-or Homebrew tap. Release archives hold the binary, licences and a `.desktop` file instead.
+or Homebrew tap. Releases offer a bare binary, which prints its licences with `vogter licences`, and an archive with the binary,
+licences and a `.desktop` file.
 
 ## Platform support
 

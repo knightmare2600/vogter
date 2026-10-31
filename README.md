@@ -15,7 +15,7 @@ Go 1.26 or newer is required.
 ```sh
 make            # gofmt check, go vet, go test -race, then build bin/vogter
 make cross      # dist/ binaries for linux, darwin and windows
-make dist       # release archives with licences and SHA256SUMS
+make dist       # release binaries and archives, with SHA256SUMS
 ```
 
 ## Use
@@ -34,6 +34,8 @@ VOGTER_URL=https://zabbix.example.com VOGTER_TOKEN=... bin/vogter
 ```
 
 Coming from zabterm? `bin/vogter import` copies your config across.
+
+`bin/vogter licences` prints Vogter's licence and those of the code it includes, so the binary can be shared alone.
 
 Press `4` for Boards: your Zabbix global dashboards, read-only. Widgets a terminal cannot draw, such as maps, show a
 placeholder, and `o` opens the page in Zabbix. See `docs/compatibility.md`.

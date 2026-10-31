@@ -10,6 +10,7 @@ internal/notify     pure diff of two snapshots into announcements
 internal/platform   desktop notifications and browser opening
 internal/theme      built-in palettes and Omarchy themes reduced to UI colour roles
 internal/ui         Bubble Tea model: state, keys, screens, panels, tables, braille chart, toasts, modals
+legal.go            embeds the licence texts for `vogter licences`
 tools/mockzbx       fixture Zabbix server for development and comparison (not shipped)
 tools/compare.sh    drives a binary under tmux for screen and request comparison
 ```

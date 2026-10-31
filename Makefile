@@ -42,8 +42,10 @@ cross:
 	    -o dist/vogter-$(VERSION)-$$os-$$arch$$ext ./cmd/vogter || exit 1; \
 	done
 
-# Release archives: binary, licences, README and the launcher entry.
-dist: cross notices
+# Release files: bare binaries, which embed the licences, and archives with the
+# binary, licences, README and launcher entry. Notices come first so that the
+# binaries embed the current text.
+dist: notices cross
 	@cd dist && for f in vogter-$(VERSION)-*; do \
 	  case $$f in *.tar.gz|*.zip|*.sha256) continue;; esac; \
 	  d=$${f%.exe}; mkdir -p "$$d.pkg"; \
@@ -52,7 +54,7 @@ dist: cross notices
 	  tar czf "$$d.tar.gz" --transform "s,^$$d.pkg,$$d," "$$d.pkg"; \
 	  rm -rf "$$d.pkg"; \
 	done
-	cd dist && sha256sum *.tar.gz > SHA256SUMS
+	cd dist && sha256sum vogter-* > SHA256SUMS
 
 notices:
 	tools/notices.sh > THIRD_PARTY_NOTICES.txt

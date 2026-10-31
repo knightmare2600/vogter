@@ -173,3 +173,18 @@ func TestColourOverrides(t *testing.T) {
 		t.Errorf("detection ignored NO_COLOR: %v", p)
 	}
 }
+
+func TestLicences(t *testing.T) {
+	isolate(t)
+	for _, name := range []string{"licences", "licenses"} {
+		var out bytes.Buffer
+		if rc := run([]string{name}, &out, io.Discard); rc != 0 {
+			t.Fatalf("%s: rc=%d", name, rc)
+		}
+		for _, want := range []string{"knightmare2600", "zabterm", "MIT", "charm.land/bubbletea/v2", "github.com/BurntSushi/toml"} {
+			if !strings.Contains(out.String(), want) {
+				t.Errorf("%s output lacks %q", name, want)
+			}
+		}
+	}
+}
