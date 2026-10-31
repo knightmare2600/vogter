@@ -6,7 +6,7 @@ import (
 	"runtime"
 )
 
-// Environment variables Vogter reads.
+// Environment variables Vægter reads.
 const (
 	EnvURL       = "VOGTER_URL"
 	EnvToken     = "VOGTER_TOKEN"

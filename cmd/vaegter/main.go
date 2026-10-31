@@ -1,4 +1,4 @@
-// Command vogter is a keyboard-driven terminal UI for Zabbix, an
+// Command vaegter is a keyboard-driven terminal UI for Zabbix, an
 // independent Go port of zabterm.
 package main
 
@@ -39,16 +39,16 @@ func appVersion() string {
 	return "dev"
 }
 
-const usage = `vogter: a terminal UI for Zabbix
+const usage = `Vægter: a terminal UI for Zabbix
 
-Usage: vogter [OPTIONS] [COMMAND]
+Usage: vaegter [OPTIONS] [COMMAND]
 
 Commands:
   init      Write a starter config (default %s)
   check     Validate the config and test the active profile against Zabbix
   config    Print the config file path
   import    Copy an existing zabterm config into place
-  licences  Print Vogter's licence and those of the code it includes
+  licences  Print Vægter's licence and those of the code it includes
 
 Options:
   -p, --profile <NAME>  Profile from the config file to use
@@ -67,7 +67,7 @@ type options struct {
 
 func parseArgs(args []string, stderr io.Writer) (options, string, error) {
 	var o options
-	fs := flag.NewFlagSet("vogter", flag.ContinueOnError)
+	fs := flag.NewFlagSet("vaegter", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	for _, n := range []string{"p", "profile"} {
 		fs.StringVar(&o.profile, n, "", "")
@@ -132,7 +132,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	if o.version {
-		fmt.Fprintln(stdout, "vogter", appVersion())
+		fmt.Fprintln(stdout, "Vægter", appVersion())
 		return 0
 	}
 	if cmd == "licences" {
@@ -153,7 +153,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return fail(stderr, err)
 		}
-		fmt.Fprintf(stdout, "\x1b[32m✓\x1b[0m wrote %s\n  add your Zabbix URL and API token, then run \x1b[1mvogter check\x1b[0m\n", p)
+		fmt.Fprintf(stdout, "\x1b[32m✓\x1b[0m wrote %s\n  add your Zabbix URL and API token, then run \x1b[1mvaegter check\x1b[0m\n", p)
 		return 0
 	case "check":
 		return check(o, path, stdout, stderr)
@@ -166,7 +166,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		if err != nil {
 			return fail(stderr, err)
 		}
-		fmt.Fprintf(stdout, "\x1b[32m✓\x1b[0m imported profiles %s from %s\n  into %s\n  run \x1b[1mvogter check\x1b[0m to test them\n",
+		fmt.Fprintf(stdout, "\x1b[32m✓\x1b[0m imported profiles %s from %s\n  into %s\n  run \x1b[1mvaegter check\x1b[0m to test them\n",
 			strings.Join(names, ", "), from, path)
 		return 0
 	}
@@ -193,7 +193,7 @@ func loadProfile(o options, path string, stderr io.Writer, showIssues bool) (*co
 }
 
 func newClient(p *config.Profile) *zabbix.Client {
-	return zabbix.New(zabbix.Options{URL: p.APIURL(), VerifyTLS: p.TLSVerify(), UserAgent: "vogter/" + appVersion()})
+	return zabbix.New(zabbix.Options{URL: p.APIURL(), VerifyTLS: p.TLSVerify(), UserAgent: "vaegter/" + appVersion()})
 }
 
 // check validates the config and runs the same calls as one poll.

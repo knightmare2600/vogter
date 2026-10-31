@@ -75,7 +75,7 @@ func TestInitHonoursConfigFlag(t *testing.T) {
 func TestVersionAndConfigCommands(t *testing.T) {
 	isolate(t)
 	var out bytes.Buffer
-	if rc := run([]string{"-V"}, &out, io.Discard); rc != 0 || !strings.HasPrefix(out.String(), "vogter ") {
+	if rc := run([]string{"-V"}, &out, io.Discard); rc != 0 || !strings.HasPrefix(out.String(), "Vægter ") {
 		t.Errorf("version: %d %q", rc, out.String())
 	}
 	out.Reset()
@@ -84,7 +84,7 @@ func TestVersionAndConfigCommands(t *testing.T) {
 	}
 }
 
-// fakeZabbix answers the calls `vogter check` makes.
+// fakeZabbix answers the calls `vaegter check` makes.
 func fakeZabbix(t *testing.T, version string, authFails bool) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

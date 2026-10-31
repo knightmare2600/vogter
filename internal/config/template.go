@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 )
 
-// Template is the starter config written by `vogter init`.
-const Template = `# Vogter: a terminal UI for Zabbix
+// Template is the starter config written by `vaegter init`.
+const Template = `# Vægter: a terminal UI for Zabbix
 #
 # Everything here is optional except a profile with a url and some way to
 # authenticate. VOGTER_URL and VOGTER_TOKEN override the active profile,

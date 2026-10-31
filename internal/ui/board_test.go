@@ -400,3 +400,16 @@ func TestBoardASCII(t *testing.T) {
 		}
 	}
 }
+
+func TestNameInDanishAndASCII(t *testing.T) {
+	m, _ := newModel(nil)
+	m = live(m)
+	wants(t, plain(m), "◆ vægter")
+	if title := m.View().WindowTitle; title != "Vægter · lab" {
+		t.Errorf("%q", title)
+	}
+	m.opts.ASCII = true
+	if v := m.View(); !strings.Contains(ansiRe.ReplaceAllString(v.Content, ""), "# vaegter") || v.WindowTitle != "Vaegter · lab" {
+		t.Errorf("ascii name: %q", v.WindowTitle)
+	}
+}

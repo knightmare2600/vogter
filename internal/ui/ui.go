@@ -846,7 +846,7 @@ func (m Model) View() tea.View {
 	if m.mouse {
 		v.MouseMode = tea.MouseModeCellMotion
 	}
-	v.WindowTitle = "vogter · " + m.opts.Profile
+	v.WindowTitle = m.brand("Vægter", "Vaegter") + " · " + m.opts.Profile
 	return v
 }
 
@@ -931,7 +931,7 @@ func (m Model) modal() string {
 func (m Model) header() string {
 	t := &m.theme
 	s := lipgloss.NewStyle()
-	left := []string{s.Foreground(t.BG).Background(t.Accent).Bold(true).Render(" ◆ vogter "), "  "}
+	left := []string{s.Foreground(t.BG).Background(t.Accent).Bold(true).Render(" ◆ " + m.brand("vægter", "vaegter") + " "), "  "}
 	counts := [len(viewNames)]string{}
 	countColour := t.OK
 	if m.snapshot != nil {
@@ -1061,10 +1061,18 @@ func (m Model) footer() string {
 	return l + strings.Repeat(" ", m.width-lipgloss.Width(l)-lipgloss.Width(r)) + r
 }
 
-// logo spells VOGTER in the half-block style of the dashboard digits.
+// brand is the name in Danish, or spelt without æ where only ASCII will do.
+func (m Model) brand(danish, ascii string) string {
+	if m.opts.ASCII {
+		return ascii
+	}
+	return danish
+}
+
+// logo spells VÆGTER in the half-block style of the dashboard digits.
 var logo = [6][3]string{
 	{"█ █", "█ █", " ▀ "},
-	{"█▀█", "█ █", "▀▀▀"},
+	{"▄▀█▀▀", "█▀█▀▀", "▀ ▀▀▀"},
 	{"█▀▀", "█ █", "▀▀▀"},
 	{"▀█▀", " █ ", " ▀ "},
 	{"█▀▀", "█▀▀", "▀▀▀"},

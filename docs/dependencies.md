@@ -15,7 +15,7 @@ Measured on 2026-10-29 with Go 1.27.3 (`GOTOOLCHAIN=local`). Licences from the G
 
 Everything else uses the standard library: HTTP, TLS, JSON, contexts, process execution, CLI flags.
 
-## Linked into the binary (`go version -m bin/vogter`)
+## Linked into the binary (`go version -m bin/vaegter`)
 
 18 modules: the five above, plus `charmbracelet/ultraviolet`, `charmbracelet/x/{term,termios,windows}`,
 `clipperhouse/{displaywidth,uax29}`, `lucasb-eyer/go-colorful`, `mattn/go-runewidth`, `muesli/cancelreader`,
@@ -26,7 +26,7 @@ Everything else uses the standard library: HTTP, TLS, JSON, contexts, process ex
 
 ## Size
 
-| | Vogter | zabterm 0.1.2 |
+| | Vægter | zabterm 0.1.2 |
 |---|---|---|
 | Linux amd64 binary | 9,179,296 bytes, static (`CGO_ENABLED=0`, `-s -w`) | 7,060,472 bytes, dynamic (libc, libm, libgcc_s) |
 | Packages | 18 Go modules | 334 Rust crates |

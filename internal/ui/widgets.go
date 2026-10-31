@@ -13,7 +13,7 @@ import (
 	"github.com/knightmare2600/vogter/internal/theme"
 )
 
-// Every panel and table in Vogter is built from these helpers. Lip Gloss
+// Every panel and table in Vægter is built from these helpers. Lip Gloss
 // has no border titles, so panels draw their own frame.
 
 func fg(c color.Color) lipgloss.Style { return lipgloss.NewStyle().Foreground(c) }

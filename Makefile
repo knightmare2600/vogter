@@ -3,7 +3,7 @@ export GOTOOLCHAIN := local
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -s -w -X main.version=$(VERSION)
-BIN     := bin/vogter
+BIN     := bin/vaegter
 TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 
 .PHONY: all build check fmt vet test race example cross dist notices clean
@@ -11,7 +11,7 @@ TARGETS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64
 all: check build
 
 build:
-	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/vogter
+	CGO_ENABLED=0 go build -trimpath -ldflags '$(LDFLAGS)' -o $(BIN) ./cmd/vaegter
 
 # fmt fails if any file needs formatting; it never rewrites files.
 fmt:
@@ -39,22 +39,22 @@ cross:
 	  os=$${t%/*}; arch=$${t#*/}; ext=; [ $$os = windows ] && ext=.exe; \
 	  echo "building $$os/$$arch"; \
 	  CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch go build -trimpath -ldflags '$(LDFLAGS)' \
-	    -o dist/vogter-$(VERSION)-$$os-$$arch$$ext ./cmd/vogter || exit 1; \
+	    -o dist/vaegter-$(VERSION)-$$os-$$arch$$ext ./cmd/vaegter || exit 1; \
 	done
 
 # Release files: bare binaries, which embed the licences, and archives with the
 # binary, licences, README and launcher entry. Notices come first so that the
 # binaries embed the current text.
 dist: notices cross
-	@cd dist && for f in vogter-$(VERSION)-*; do \
+	@cd dist && for f in vaegter-$(VERSION)-*; do \
 	  case $$f in *.tar.gz|*.zip|*.sha256) continue;; esac; \
 	  d=$${f%.exe}; mkdir -p "$$d.pkg"; \
-	  cp "$$f" "$$d.pkg/vogter$${f##$$d}"; \
-	  cp ../README.md ../LICENSE ../NOTICE ../THIRD_PARTY_NOTICES.txt ../packaging/vogter.desktop "$$d.pkg/"; \
+	  cp "$$f" "$$d.pkg/vaegter$${f##$$d}"; \
+	  cp ../README.md ../LICENSE ../NOTICE ../THIRD_PARTY_NOTICES.txt ../packaging/vaegter.desktop "$$d.pkg/"; \
 	  tar czf "$$d.tar.gz" --transform "s,^$$d.pkg,$$d," "$$d.pkg"; \
 	  rm -rf "$$d.pkg"; \
 	done
-	cd dist && sha256sum vogter-* > SHA256SUMS
+	cd dist && sha256sum vaegter-* > SHA256SUMS
 
 notices:
 	tools/notices.sh > THIRD_PARTY_NOTICES.txt

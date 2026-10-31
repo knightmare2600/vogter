@@ -1,9 +1,9 @@
 # Notes for upstream zabterm pull requests
 
-Defects found while porting, fixed in Vogter, to offer upstream as PRs at the end of the port. Locations
+Defects found while porting, fixed in Vægter, to offer upstream as PRs at the end of the port. Locations
 refer to zabterm commit `d57c642`. Nothing has been submitted yet.
 
-| ID | Status in Vogter | Upstream location | Problem | Reproduction | Proposed Rust change |
+| ID | Status in Vægter | Upstream location | Problem | Reproduction | Proposed Rust change |
 |---|---|---|---|---|---|
 | D1 | Fixed (M2) | `app.rs:160` + `worker.rs:50-56` | Two full polls at start-up: `App::new` sends `Cmd::Refresh` and the first `interval.tick()` fires immediately | Run against any server and log requests: two `host.get` within ~1 ms | Drop `app.send(Cmd::Refresh)` from `App::new`, or call `ticker.tick().await` once before the loop |
 | D3 | Fixed (M2) | `api.rs:28-35`, `worker.rs:88-93`, `main.rs:126` | `user.login` sessions are never closed; each run and each re-login leaves a session behind (the Zabbix manual asks for `user.logout`) | `username`/`password` profile; start and quit; no `user.logout` request | Track whether the token is a session; call `user.logout` with `[]` on quit and before replacing the client |

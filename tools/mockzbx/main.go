@@ -1,5 +1,5 @@
 // Command mockzbx is a fixture Zabbix JSON-RPC endpoint for development and
-// for comparing Vogter with zabterm. It logs every request as JSON lines,
+// for comparing Vægter with zabterm. It logs every request as JSON lines,
 // with the credential redacted. Response shapes match porting-audit §6.4.
 package main
 

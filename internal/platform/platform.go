@@ -28,7 +28,7 @@ func notifyCommand(goos, title, body string, urgent bool) []string {
 	case "darwin":
 		// Passing the text as arguments avoids quoting it into the script.
 		return []string{"osascript", "-e", "on run argv", "-e",
-			`display notification (item 2 of argv) with title "vogter" subtitle (item 1 of argv)`,
+			`display notification (item 2 of argv) with title "Vægter" subtitle (item 1 of argv)`,
 			"-e", "end run", title, body}
 	case "windows":
 		return nil
@@ -37,7 +37,7 @@ func notifyCommand(goos, title, body string, urgent bool) []string {
 	if urgent {
 		urgency = "critical"
 	}
-	return []string{"notify-send", "-a", "vogter", "-u", urgency, title, body}
+	return []string{"notify-send", "-a", "Vægter", "-u", urgency, title, body}
 }
 
 // Notify sends a desktop notification. A missing helper is an error the

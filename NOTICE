@@ -1,11 +1,11 @@
-Vogter
+Vægter
 =====
 
-Vogter is an independent Go port of zabterm by Ender KUŞ
+Vægter is an independent Go port of zabterm by Ender KUŞ
 (https://github.com/enderkus/zabterm), based on commit
 d57c64239fbdc65cdb6b926a62397c87a1bd7b04 (release v0.1.2).
 
-Vogter is not affiliated with, or endorsed by, the zabterm author. zabterm's
+Vægter is not affiliated with, or endorsed by, the zabterm author. zabterm's
 MIT licence notice is reproduced in LICENSE. Theme palette values, role
 formulas, request parameters, item keys and screen layouts follow zabterm.
 

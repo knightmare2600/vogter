@@ -4,7 +4,7 @@ package vogter
 
 import _ "embed"
 
-// LicenceFiles are the texts `vogter licences` prints, in order.
+// LicenceFiles are the texts `vaegter licences` prints, in order.
 var LicenceFiles = []string{license, notice, thirdParty}
 
 var (

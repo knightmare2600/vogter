@@ -1,4 +1,4 @@
-// Package config loads, validates and resolves Vogter's configuration: a
+// Package config loads, validates and resolves Vægter's configuration: a
 // TOML file with a few global settings and one or more named Zabbix
 // profiles. The schema matches zabterm's so existing files import unchanged.
 package config
@@ -83,8 +83,8 @@ func defaults() Config {
 	}
 }
 
-// Issue is a validation finding. Errors stop Vogter from starting; warnings
-// are reported by `vogter check` and otherwise ignored.
+// Issue is a validation finding. Errors stop Vægter from starting; warnings
+// are reported by `vaegter check` and otherwise ignored.
 type Issue struct {
 	Error bool
 	Msg   string
@@ -143,7 +143,7 @@ func Load(path string) (*Config, []Issue, error) {
 		c.DefaultProfile = "env"
 	}
 	if len(c.Profiles) == 0 {
-		return nil, issues, fmt.Errorf("%w.\n\n  Run `vogter init` to write a starter config to %s\n  or export %s and %s",
+		return nil, issues, fmt.Errorf("%w.\n\n  Run `vaegter init` to write a starter config to %s\n  or export %s and %s",
 			ErrNoProfiles, path, EnvURL, EnvToken)
 	}
 	issues = append(issues, c.validate()...)

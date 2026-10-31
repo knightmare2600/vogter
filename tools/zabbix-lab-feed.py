@@ -59,7 +59,7 @@ def seed():
   call("hostinterface.update", {
     "interfaceid": host["interfaces"][0]["interfaceid"], "useip": 0, "dns": "vl-agent", "ip": "",
   })
-  group = call("hostgroup.create", {"name": "Vogter lab"})["groupids"][0]
+  group = call("hostgroup.create", {"name": "Vægter lab"})["groupids"][0]
   for name in HOSTS:
     hostid = call("host.create", {
       "host": name, "groups": [{"groupid": group}], "tags": [{"tag": "env", "value": "lab"}],
@@ -106,7 +106,7 @@ def feed():
 
 wait_for_api()
 token = call("user.login", {"username": "Admin", "password": "zabbix"})
-if not call("hostgroup.get", {"filter": {"name": ["Vogter lab"]}}):
+if not call("hostgroup.get", {"filter": {"name": ["Vægter lab"]}}):
   seed()
   time.sleep(20)
 print("feeding the lab; Ctrl-C stops it", flush=True)

@@ -1,12 +1,12 @@
 #!/bin/sh
-# Disposable Zabbix 7.0 lab for testing Vogter against a real server.
+# Disposable Zabbix 7.0 lab for testing Vægter against a real server.
 # The web front end binds to 127.0.0.1 only; nothing is reachable off this host.
 #
 #   tools/zabbix-lab.sh up      start the containers
 #   tools/zabbix-lab.sh feed    seed hosts, then keep problems opening and resolving
 #   tools/zabbix-lab.sh down    remove the containers, network and volumes
 #
-# Then: bin/vogter -c tools/zabbix-lab.toml
+# Then: bin/vaegter -c tools/zabbix-lab.toml
 set -eu
 
 net=vogter-lab

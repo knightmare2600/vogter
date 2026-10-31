@@ -1,4 +1,4 @@
-# Vogter config for the throwaway lab in tools/zabbix-lab.sh. These are the
+# Vægter config for the throwaway lab in tools/zabbix-lab.sh. These are the
 # stock Zabbix credentials of a local container, not a secret.
 default_profile = "lab"
 theme = "auto"

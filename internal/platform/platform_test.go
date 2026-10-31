@@ -7,7 +7,7 @@ import (
 
 func TestNotifyCommand(t *testing.T) {
 	got := notifyCommand("linux", "T", "B", true)
-	if !slices.Equal(got, []string{"notify-send", "-a", "vogter", "-u", "critical", "T", "B"}) {
+	if !slices.Equal(got, []string{"notify-send", "-a", "Vægter", "-u", "critical", "T", "B"}) {
 		t.Errorf("%v", got)
 	}
 	if got := notifyCommand("linux", "T", "B", false); got[4] != "normal" {

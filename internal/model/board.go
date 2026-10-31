@@ -14,7 +14,7 @@ import (
 const GridColumns = 72
 
 // DefaultWidgetRange is the graph period when a widget does not set one that
-// Vogter can read, and the Zabbix default.
+// Vægter can read, and the Zabbix default.
 const DefaultWidgetRange = 3600
 
 // Board is a Zabbix dashboard.

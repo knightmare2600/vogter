@@ -23,7 +23,7 @@ const (
 	KindAuth
 	// KindPermission is a call the account is not allowed to make.
 	KindPermission
-	// KindShape is a response missing a field Vogter needs.
+	// KindShape is a response missing a field Vægter needs.
 	KindShape
 )
 

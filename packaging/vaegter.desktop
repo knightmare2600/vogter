@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
-Name=Vogter
+Name=Vægter
 GenericName=Monitoring
 Comment=Terminal UI for Zabbix
-Exec=vogter
+Exec=vaegter
 Terminal=true
 Icon=utilities-system-monitor
 Categories=System;Monitor;

@@ -1,18 +1,18 @@
 # Compatibility with zabterm
 
-Where Vogter deliberately differs from zabterm 0.1.2. Defect IDs refer to `porting-audit.md` §13.
+Where Vægter deliberately differs from zabterm 0.1.2. Defect IDs refer to `porting-audit.md` §13.
 Updated as each milestone lands.
 
 ## Configuration and CLI
 
-| Area | zabterm | Vogter |
+| Area | zabterm | Vægter |
 |---|---|---|
 | Config path | `~/.config/zabterm/config.toml` | `~/.config/vogter/config.toml` (`%AppData%\vogter` on Windows) |
 | Environment | `ZABTERM_URL`, `ZABTERM_TOKEN`, `ZABTERM_TRUECOLOR` | `VOGTER_URL`, `VOGTER_TOKEN`, `VOGTER_TRUECOLOR`; the `ZABTERM_*` variables are not read |
 | Schema | — | Identical keys and meaning |
 | `init -c PATH` | Ignores `-c` (D15) | Writes to `PATH`, atomically, mode 0600 |
 | Empty token value | Accepted (D14) | An empty `VOGTER_TOKEN` counts as unset; an empty `token_env` variable or empty `token_cmd` output is an error |
-| Unknown keys, theme, severity | Silently ignored or defaulted (D17) | Same fallback values, plus a warning (shown by `vogter check`) |
+| Unknown keys, theme, severity | Silently ignored or defaulted (D17) | Same fallback values, plus a warning (shown by `vaegter check`) |
 | Missing `default_profile` target, profile without `url` | Not reported at load (exact failure point unverified) | Error at load |
 | Plain-text secret in a group/world-readable file | — | Warning with the `chmod` to fix it |
 | `token_cmd` | `sh -c`, no time limit | `sh -c` (`cmd /C` on Windows), 2 minute limit |
@@ -21,7 +21,7 @@ Updated as each milestone lands.
 
 ## Zabbix API
 
-| Area | zabterm | Vogter |
+| Area | zabterm | Vægter |
 |---|---|---|
 | Target version | "7.x and 8.0" | 7.0 LTS primary. 6.4 runs with an "untested" warning. Below 6.4 is refused |
 | Start-up | Two polls (D1) | One poll |
@@ -29,7 +29,7 @@ Updated as each milestone lands.
 | `user.login` sessions | Never closed (D3) | `user.logout` on quit and before re-login |
 | Re-login trigger | Substring match on any error (D18) | Only when the error is classed as auth and the profile uses a session |
 | Failed call with partial data | Fails the whole call | Same: a failed call never returns data |
-| User-Agent | `zabterm/<ver>` | `vogter/<ver>` |
+| User-Agent | `zabterm/<ver>` | `vaegter/<ver>` |
 
 ## Screens
 
@@ -41,7 +41,7 @@ charts differ by design (hourly trends). Polling requests matched exactly; host 
 described below. With the mock's `-flip` mode and a recording `notify-send`, both sent the same three
 notifications with the same urgency.
 
-| Area | zabterm | Vogter |
+| Area | zabterm | Vægter |
 |---|---|---|
 | Hosts table below 130 columns | Columns squeezed | Drops Groups, then Interface below 110 |
 | Below 80×24 | No special handling (result not tested) | "terminal too small" notice |
@@ -58,15 +58,15 @@ notifications with the same urgency.
 | Theme colour depth | Own nearest-256 mapping | Bubble Tea's colour-profile downsampling, so the 256-colour result can differ |
 | "Resolved" past 500 problems (D10) | False "Resolved" notes | None while the problem list is truncated |
 | macOS notification text (D11) | Quoted into AppleScript with Rust escapes | Passed as arguments (unverified: not run on macOS) |
-| Notification app name | `zabterm` | `vogter` |
+| Notification app name | `zabterm` | `Vægter` |
 | Windows notifications | No Windows build | One toast says they are unsupported; toasts continue |
-| `vogter import` | n/a | Validated copy of a zabterm config, comments kept, mode 0600, never overwrites without `--force` |
+| `vaegter import` | n/a | Validated copy of a zabterm config, comments kept, mode 0600, never overwrites without `--force` |
 | Late detail for another host or range | Range mismatch shown briefly | Dropped |
 
 ## Parity with the audit checklist
 
 Every row of the checklist in `porting-audit.md` §5 is implemented, apart from Z1. There is no `install.sh`
-or Homebrew tap. Releases offer a bare binary, which prints its licences with `vogter licences`, and an archive with the binary,
+or Homebrew tap. Releases offer a bare binary, which prints its licences with `vaegter licences`, and an archive with the binary,
 licences and a `.desktop` file.
 
 ## Platform support
@@ -83,13 +83,13 @@ has not run yet, and CI does not exercise a real terminal.
 
 ## Scrollbars and mouse
 
-Vogter adds a scrollbar to any table that overflows; a table that fits looks as it does in zabterm. The mouse wheel is
+Vægter adds a scrollbar to any table that overflows; a table that fits looks as it does in zabterm. The mouse wheel is
 an addition, off by default: `mouse = true` in the config or `M` while running. `Shift` plus the wheel pans a board
 where the terminal passes that through.
 
 ## Zabbix dashboards
 
-The `4 Boards` screen is new in Vogter; zabterm has no equivalent, so it adds a fourth tab to the header. It is read-only
+The `4 Boards` screen is new in Vægter; zabterm has no equivalent, so it adds a fourth tab to the header. It is read-only
 and only calls the API while open. Read through `dashboard.get`, global dashboards only, on the 72-column grid. The layout
 is always Zabbix's: a terminal narrower than 120 columns or too short for the page becomes a window onto it, with
 scrollbars, `j k h l`, page up and down, and `ctrl-d ctrl-u`.
@@ -111,13 +111,13 @@ Template dashboards are not read.
 
 Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`:
 
-- `vogter check` with `token_cmd` and username/password; a bad token, bad password and wrong URL each gave the right hint.
+- `vaegter check` with `token_cmd` and username/password; a bad token, bad password and wrong URL each gave the right hint.
 - `go test -tags live ./internal/integration` passed.
 - Dashboard, hosts, problems, latest data, acknowledge, and graphs at 1h, 24h and 7d (trends).
 - Discovered `net.if` and `vfs.fs.dependent.size` keys, including a real ext4-backed `/data` mount in the filesystems
   panel. The agent's `/etc/*` container mounts were excluded as designed.
 - `4 Boards` on the stock `Global view`, `Zabbix server health` and `Zabbix server` dashboards, at 150×45 and 80×24, including scrolling both ways.
-- An expired password session: one poll showed offline, then Vogter logged in again unaided.
+- An expired password session: one poll showed offline, then Vægter logged in again unaided.
 - Real wording of authentication and permission errors, from `host.get`, `user.login`, `event.acknowledge` and
   `host.create`, is classified correctly.
 

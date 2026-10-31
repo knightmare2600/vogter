@@ -62,7 +62,7 @@ func newFake(t *testing.T, f *fake) *Client {
 	t.Helper()
 	srv := httptest.NewServer(f)
 	t.Cleanup(srv.Close)
-	return New(Options{URL: srv.URL + "/api_jsonrpc.php", VerifyTLS: true, UserAgent: "vogter/test"})
+	return New(Options{URL: srv.URL + "/api_jsonrpc.php", VerifyTLS: true, UserAgent: "vaegter/test"})
 }
 
 func TestBearerOnlyWhereAllowed(t *testing.T) {

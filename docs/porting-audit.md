@@ -1,8 +1,8 @@
-# Vogter: porting audit of zabterm
+# Vægter: porting audit of zabterm
 
 Milestone 1 deliverable. Audit date: 2026-10-29. Author: knightmare2600 (with Claude Code).
 
-Vogter is an independent Go port of zabterm. It is not affiliated with, or endorsed by, the upstream
+Vægter is an independent Go port of zabterm. It is not affiliated with, or endorsed by, the upstream
 author.
 
 Every claim below is marked with how it was established:
@@ -40,15 +40,15 @@ The repository also holds a Jekyll GitHub Pages site (`docs/`), icons (`assets/`
 - No file carries its own licence header. No vendored third-party code exists in the repository. **[src]**
 - The icons (`assets/zabterm*.png`, `zabterm.svg`) and screenshots carry no separate licence. Presumption:
   they fall under the repository MIT licence. The name "zabterm" and the icon are upstream branding, so
-  Vogter will use neither (it is a separate project).
-- The Rust dependency licences (§12) bind only the Rust binary. Vogter copies no Rust crate code, so they
-  create no obligation for Vogter.
+  Vægter will use neither (it is a separate project).
+- The Rust dependency licences (§12) bind only the Rust binary. Vægter copies no Rust crate code, so they
+  create no obligation for Vægter.
 
-**Obligations for Vogter:**
+**Obligations for Vægter:**
 
-1. Ship upstream's MIT notice. Plan: `LICENSE` carries Vogter's own MIT notice, followed by upstream's full
+1. Ship upstream's MIT notice. Plan: `LICENSE` carries Vægter's own MIT notice, followed by upstream's full
    notice under a "Portions derived from zabterm" heading. A `NOTICE` (or README section) explains that
-   Vogter is an independent Go port of zabterm at commit `d57c642`, with no affiliation or endorsement.
+   Vægter is an independent Go port of zabterm at commit `d57c642`, with no affiliation or endorsement.
 2. Keep upstream's copyright line verbatim.
 3. Record Go dependency licences in `docs/dependencies.md` (all candidates are MIT or BSD-3-Clause, §12.3).
    BSD-3-Clause requires reproducing its notice in binary distributions. That is a release-packaging task
@@ -66,7 +66,7 @@ repository's MIT licence, so it creates no extra obligation. Recorded for comple
 | Build from source | **Not done.** `cargo`/`rustc` are not installed here, and per the install boundary I did not install them |
 | Run the release binary | **Done.** I downloaded `zabterm-v0.1.2-x86_64-unknown-linux-gnu.tar.gz` with `gh release download`. Its SHA-256 (`f5b947ff…fead08`) matches the asset digest GitHub records. I ran it under an isolated `HOME`/`XDG_CONFIG_HOME` in the scratchpad, so your real config was not touched |
 | Binary | 7,060,472 bytes, stripped, LTO, dynamically linked to `libc`, `libm` and `libgcc_s` only |
-| Mock server | A stdlib-only Go fixture JSON-RPC server (audit scaffolding, not part of Vogter) that logs every request, with the token redacted |
+| Mock server | A stdlib-only Go fixture JSON-RPC server (audit scaffolding, not part of Vægter) that logs every request, with the token redacted |
 
 Exercised and observed **[run]**:
 
@@ -133,10 +133,10 @@ Status key: **I** = implemented and observed working **[run]**; **S** = implemen
 | ID | Feature | Upstream location | Status | Go plan |
 |---|---|---|---|---|
 | **CLI** | | | | |
-| C1 | `zabterm` launches TUI; fails fast on missing credentials before entering the TUI | `main.rs:56-81` | I | `cmd/vogter`: same order (load → profile → resolve auth → TUI) |
-| C2 | `init [--force]`: writes commented template, mode 0600, refuses to overwrite | `main.rs:59`, `config.rs:202` | I (P: ignores `-c`, §13 D15) | `vogter init [--force]`, honouring `-c`. Atomic write; 0600 on Unix |
-| C3 | `check`: prints config/profile/endpoint, then version, host count and problem count | `main.rs:83` | I | `vogter check`, plus distinct error classes (§6.5) |
-| C4 | `config`: prints config path | `main.rs:65` | I | `vogter config` |
+| C1 | `zabterm` launches TUI; fails fast on missing credentials before entering the TUI | `main.rs:56-81` | I | `cmd/vaegter`: same order (load → profile → resolve auth → TUI) |
+| C2 | `init [--force]`: writes commented template, mode 0600, refuses to overwrite | `main.rs:59`, `config.rs:202` | I (P: ignores `-c`, §13 D15) | `vaegter init [--force]`, honouring `-c`. Atomic write; 0600 on Unix |
+| C3 | `check`: prints config/profile/endpoint, then version, host count and problem count | `main.rs:83` | I | `vaegter check`, plus distinct error classes (§6.5) |
+| C4 | `config`: prints config path | `main.rs:65` | I | `vaegter config` |
 | C5 | `-p/--profile`, `-c/--config` (global, before or after subcommand) | `main.rs:20-25` | I | Same flags, accepted in either position |
 | C6 | `-t/--theme` override for one run | `main.rs:28,74` | S | Same |
 | C7 | `-V/--version`, `-h/--help` | clap | I | Same; version from `-ldflags` |
@@ -267,7 +267,7 @@ Semantic mapping **[src]**:
 - Availability: choose the agent interface (`type=="1"`), else the first interface. Down if that
   interface's `available=="2"` **or** `active_available=="2"`, else Up if either is `"1"`, else Unknown.
 - `Item.value()` is `None` when `lastclock=="0"` or the value is unparseable. This is how "missing" stays
-  distinct from zero, and Vogter keeps it.
+  distinct from zero, and Vægter keeps it.
 - Numeric means `value_type` 0 (float) or 3 (unsigned).
 
 ### 6.5 Version compatibility **[doc]**
@@ -296,13 +296,13 @@ Conclusions:
   selector marks 7.4 as "current". Upstream's "tested against 8.0" therefore refers to a pre-release.
 - **Decided (2026-10-29): the primary target is Zabbix 7.0 LTS**, the current LTS release (8.0 is still a
   release candidate). Fixtures, request shapes and parameter choices are checked against the 7.0 manual
-  first. 7.2, 7.4 and 8.0 are secondary: they are tracked for differences that affect Vogter's calls, and
-  §6.5 has found none so far. Server version detection uses `apiinfo.version`. Below 7.0 Vogter warns
+  first. 7.2, 7.4 and 8.0 are secondary: they are tracked for differences that affect Vægter's calls, and
+  §6.5 has found none so far. Server version detection uses `apiinfo.version`. Below 7.0 Vægter warns
   that the version is untested. Below 6.4 it refuses to start, because the API features it needs
   (Bearer header, `selectHostGroups`, `active_available`) are missing. The comparison is pure and
   testable.
 
-Vogter error classes (new, required by the brief). Upstream folds all of these into strings:
+Vægter error classes (new, required by the brief). Upstream folds all of these into strings:
 
 | Class | Detection |
 |---|---|
@@ -344,16 +344,16 @@ verify_tls = true
 Lenient parsing: unknown keys are ignored. An unknown theme silently becomes tokyo-night. An unknown
 `min_severity` silently becomes average. **[src]**
 
-### 7.2 Vogter schema
+### 7.2 Vægter schema
 
 Same keys and semantics, so a zabterm file imports unchanged. Validation (new, reported by
-`vogter check` and at start-up) produces errors or warnings for: unknown keys, unknown theme, unknown
+`vaegter check` and at start-up) produces errors or warnings for: unknown keys, unknown theme, unknown
 severity, `refresh_interval < 2`, a profile without `url`, a profile without any credential, and more
 than one credential source set (a warning; the precedence still applies).
 
 ### 7.3 Paths and environment
 
-| | zabterm | Vogter |
+| | zabterm | Vægter |
 |---|---|---|
 | Config (Linux/macOS) | `$XDG_CONFIG_HOME/zabterm/config.toml` (only if absolute), else `~/.config/zabterm/config.toml` | `$XDG_CONFIG_HOME/vogter/config.toml`, else `~/.config/vogter/config.toml` (matches upstream convention, not `os.UserConfigDir` on macOS) |
 | Config (Windows) | n/a | `%AppData%\vogter\config.toml` (`os.UserConfigDir`) |
@@ -363,11 +363,11 @@ than one credential source set (a warning; the precedence still applies).
 
 ### 7.4 Migration from zabterm
 
-Proposed `vogter import [--from PATH] [--force]`:
+Proposed `vaegter import [--from PATH] [--force]`:
 
 1. Default source: the zabterm path.
 2. Parse and validate.
-3. Write to the Vogter path with mode 0600, atomically (temp file + rename).
+3. Write to the Vægter path with mode 0600, atomically (temp file + rename).
 4. Refuse to overwrite without `--force`, showing the diff target path.
 5. Never modify the source.
 6. Print what was imported, with secrets shown as `<set>`.
@@ -379,7 +379,7 @@ variables as a fallback is decision Q5.
 
 - Upstream never prints tokens (`check` prints URL and profile only). **[run]**
 - The `token_cmd` stderr is included in error text. That is acceptable: it is not the secret.
-- Vogter adds: a `Secret` type whose `String()`/`GoString()`/`slog` value is `<redacted>`; tokens are
+- Vægter adds: a `Secret` type whose `String()`/`GoString()`/`slog` value is `<redacted>`; tokens are
   never placed in error strings; and a warning when the config file is group- or world-readable and
   contains `token` or `password`.
 
@@ -467,7 +467,7 @@ I have not observed this on an actual Omarchy 4 machine; it is derived from the 
 `v4.0.6`. To verify on Omarchy 4: run `ls ~/.config/omarchy/current ~/.local/state/omarchy/current`, then
 `zabterm -t auto` and check the help modal's theme name.
 
-Vogter plan:
+Vægter plan:
 
 1. Look for the current theme in `~/.local/state/omarchy/current/theme`, then
    `~/.config/omarchy/current/theme`.
@@ -484,12 +484,12 @@ Covered by N1–N5 in §5. Deduplication: `seen_events` is replaced with the cur
 snapshot, so an event is announced at most once while it stays present. The first snapshot only seeds
 it, so nothing is announced at start-up. Host transitions compare against the previous snapshot only.
 
-Vogter keeps the same model as a pure function `Diff(prev, cur Snapshot, min Severity) []Note`, with
+Vægter keeps the same model as a pure function `Diff(prev, cur Snapshot, min Severity) []Note`, with
 table tests.
 
 ## 11. Platform-specific behaviour
 
-| Concern | Upstream Linux | Upstream macOS | Vogter Windows (new) |
+| Concern | Upstream Linux | Upstream macOS | Vægter Windows (new) |
 |---|---|---|---|
 | Desktop notification | `notify-send -a zabterm -u {critical|normal} title body` | `osascript -e 'display notification … with title "zabterm" subtitle …'` (string quoting uses Rust `{:?}`, D11) | Not supported initially; one toast explains it (decision Q6) |
 | Open URL | `xdg-open` | `open` | `rundll32 url.dll,FileProtocolHandler <url>` (avoids `cmd` quoting of `&`); unverified until tested on Windows |
@@ -520,7 +520,7 @@ only after running them on real hosts or in CI runners.
 
 Transitively, `Cargo.lock` holds **334 packages**, including `ring` 0.17.14 (Apache-2.0 AND ISC) and
 `rustls` 0.23.45 (Apache-2.0 OR ISC OR MIT). I did not check the licence of each of the 334 transitive
-crates, because none of their code is carried into Vogter.
+crates, because none of their code is carried into Vægter.
 
 ### 12.2 Essential integrations
 
@@ -559,7 +559,7 @@ Milestone 2 will give the exact count.
   supported stable releases.
 - Bubble Tea v2.1.0 needs Go ≥1.26.0 and Lip Gloss v2.0.6 needs ≥1.25.0.
 - `GOTOOLCHAIN=auto` is set, so building would silently download a newer toolchain. That would breach
-  the install boundary, so Vogter's Makefile will set `GOTOOLCHAIN=local`.
+  the install boundary, so Vægter's Makefile will set `GOTOOLCHAIN=local`.
 - Options (decision Q1):
   - (a) Install Go 1.26.x or 1.27.x, then use Charm v2. **Recommended.**
   - (b) Stay on 1.24 with Bubble Tea v1.3.10 (`go 1.24.0`) + Lip Gloss v1.1.0. That means the
@@ -572,7 +572,7 @@ Bubble Tea v2.1.1 (2026-10-28) is too new to pin under the two-week rule; v2.1.0
 Default handling: preserve user-visible behaviour, fix defects, and document every deviation in
 `docs/compatibility.md`. Items marked ⚑ change behaviour and need your decision (Q3).
 
-| ID | Finding | Evidence | Proposed Vogter handling |
+| ID | Finding | Evidence | Proposed Vægter handling |
 |---|---|---|---|
 | D1 | Duplicate initial poll: `App::new` sends `Refresh` and the worker's interval also fires immediately | [run] two snapshots 1 ms apart | One initial poll |
 | D2 ⚑ | Host page: every snapshot triggers another detail request, and `r` sends both, so detail is fetched twice per poll; the full range (up to 7 days of raw history) is re-read every poll | [run] | One detail fetch per poll. Incremental history (`time_from = last clock + 1`), append and trim. For 24h/7d, use `trend.get` (hourly) per decision Q4 |
@@ -605,7 +605,7 @@ Simplified from the brief: one `zabbix` package instead of `api` + `zabbix`, and
 
 ```
 vogter/
-├── cmd/vogter/main.go          # CLI dispatch: (no cmd) | init | check | config | import ; -p -c -t -V -h
+├── cmd/vaegter/main.go          # CLI dispatch: (no cmd) | init | check | config | import ; -p -c -t -V -h
 ├── internal/
 │   ├── config/                 # schema, load, validate, paths, credential resolution, Secret, template, import
 │   ├── zabbix/                 # JSON-RPC client (no TUI imports), typed methods, wire types, error classes, version
@@ -705,10 +705,10 @@ Resolved since the audit: (4) Lip Gloss v2.0.6 has no border titles, so panels d
 | Q2 | Initialise a git repository in `~/vogter` now? (Nothing has been committed or initialised.) | Yes |
 | Q3 | Accept the behaviour-changing fixes D2, D3, D9/D10, D14, D15, D17 as listed? | Yes |
 | Q4 | 24h/7d host graphs: keep raw `history.get` (parity) or use `trend.get` (hourly)? | `trend.get` for ≥24h, raw below |
-| Q5 | Honour `ZABTERM_URL`/`ZABTERM_TOKEN` as fallbacks, or only `VOGTER_*`? | Only `VOGTER_*`; `vogter import` covers migration |
+| Q5 | Honour `ZABTERM_URL`/`ZABTERM_TOKEN` as fallbacks, or only `VOGTER_*`? | Only `VOGTER_*`; `vaegter import` covers migration |
 | Q6 | Windows in scope for notifications and `token_cmd` (`cmd /C`)? | Opener and `token_cmd` yes; notifications disabled with an explanation |
 
-## Appendix A: audit scaffolding (not part of Vogter)
+## Appendix A: audit scaffolding (not part of Vægter)
 
 These live in the session scratchpad and are not committed:
 

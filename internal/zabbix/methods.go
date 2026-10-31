@@ -184,7 +184,7 @@ func (c *Client) History(ctx context.Context, itemIDs []string, valueType int, f
 	return only(out, err)
 }
 
-// Trends returns hourly aggregates collected at or after from. Vogter uses
+// Trends returns hourly aggregates collected at or after from. Vægter uses
 // them for ranges of 24 hours and longer instead of raw history.
 func (c *Client) Trends(ctx context.Context, itemIDs []string, from int64) ([]TrendPoint, error) {
 	if len(itemIDs) == 0 {

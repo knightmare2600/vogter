@@ -1,7 +1,7 @@
 # Architecture
 
 ```
-cmd/vogter          CLI: (none) | init | check | config ; -p -c -t -V -h --force
+cmd/vaegter          CLI: (none) | init | check | config ; -p -c -t -V -h --force
 internal/config     schema, load + validate, paths, credential resolution, Secret, init template
 internal/zabbix     JSON-RPC client (no UI imports), typed methods, error kinds, version support
 internal/model      pure: joins API responses into hosts and problems, filters, sorts, tiles, sparkline buffers
@@ -10,7 +10,7 @@ internal/notify     pure diff of two snapshots into announcements
 internal/platform   desktop notifications and browser opening
 internal/theme      built-in palettes and Omarchy themes reduced to UI colour roles
 internal/ui         Bubble Tea model: state, keys, screens, panels, tables, braille chart, toasts, modals
-legal.go            embeds the licence texts for `vogter licences`
+legal.go            embeds the licence texts for `vaegter licences`
 tools/mockzbx       fixture Zabbix server for development and comparison (not shipped)
 tools/compare.sh    drives a binary under tmux for screen and request comparison
 ```

@@ -45,14 +45,14 @@ func (v Version) AtLeast(major, minor int) bool {
 	return v.Major > major || (v.Major == major && v.Minor >= minor)
 }
 
-// Support describes how well Vogter supports a server version.
+// Support describes how well Vægter supports a server version.
 type Support int
 
 const (
-	// Supported is 7.0 LTS or newer, the versions Vogter is checked against.
+	// Supported is 7.0 LTS or newer, the versions Vægter is checked against.
 	Supported Support = iota
-	// Untested is 6.4: the API has every feature Vogter uses, but nobody
-	// has run Vogter against it.
+	// Untested is 6.4: the API has every feature Vægter uses, but nobody
+	// has run Vægter against it.
 	Untested
 	// Unsupported is older than 6.4, which lacks the Bearer header,
 	// selectHostGroups and active_available.
@@ -75,9 +75,9 @@ func SupportFor(v Version) Support {
 func (s Support) Describe(v Version) string {
 	switch s {
 	case Untested:
-		return fmt.Sprintf("Zabbix %s is untested; Vogter targets 7.0 LTS and newer", v)
+		return fmt.Sprintf("Zabbix %s is untested; Vægter targets 7.0 LTS and newer", v)
 	case Unsupported:
-		return fmt.Sprintf("Zabbix %s is not supported: Vogter needs 6.4 or newer (7.0 LTS recommended)", v)
+		return fmt.Sprintf("Zabbix %s is not supported: Vægter needs 6.4 or newer (7.0 LTS recommended)", v)
 	}
 	return ""
 }

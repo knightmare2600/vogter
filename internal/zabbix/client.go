@@ -1,5 +1,5 @@
 // Package zabbix is a small JSON-RPC client for the Zabbix API methods
-// Vogter needs. It has no knowledge of the terminal UI; every call takes a
+// Vægter needs. It has no knowledge of the terminal UI; every call takes a
 // context and returns *Error on failure.
 package zabbix
 

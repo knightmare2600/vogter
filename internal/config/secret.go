@@ -2,7 +2,7 @@ package config
 
 import "log/slog"
 
-// placeholder is the token written by `vogter init`; it counts as unset.
+// placeholder is the token written by `vaegter init`; it counts as unset.
 const placeholder = "paste-your-api-token-here"
 
 // Secret holds a credential. Every way of formatting it prints a redaction

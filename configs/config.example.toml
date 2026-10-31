@@ -1,4 +1,4 @@
-# Vogter: a terminal UI for Zabbix
+# Vægter: a terminal UI for Zabbix
 #
 # Everything here is optional except a profile with a url and some way to
 # authenticate. VOGTER_URL and VOGTER_TOKEN override the active profile,
