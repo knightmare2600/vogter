@@ -247,6 +247,8 @@ func bigText(t *theme.Theme, text, suffix string, c color.Color) []string {
 			g = [3]string{" ", " ", "▀"}
 		case ch == '-':
 			g = [3]string{"   ", "▀▀▀", "   "}
+		case ch == ':':
+			g = [3]string{" ", "▀", "▀"}
 		}
 		for r := range rows {
 			if i > 0 {
@@ -303,6 +305,15 @@ type table struct {
 // render returns the table's lines, at most h of them and w cells wide.
 func (tb table) render(t *theme.Theme, w, h int) []string {
 	const spacing = 2
+	// A list that does not fit gives up its last column for a scrollbar.
+	rows := h - 1
+	if tb.gap {
+		rows--
+	}
+	bar := rows > 0 && tb.n > rows
+	if bar {
+		w--
+	}
 	line := func(cells []string, base lipgloss.Style, mark string) string {
 		var b strings.Builder
 		if tb.marker {
@@ -336,13 +347,41 @@ func (tb table) render(t *theme.Theme, w, h int) []string {
 		out = append(out, "")
 	}
 	first, last := tb.scroll.window(tb.sel, h-len(out), tb.n)
+	var side []string
+	if bar {
+		side = scrollbar(t, rows, tb.n, first, "│")
+	}
 	for i := first; i < last; i++ {
 		base, mark := lipgloss.NewStyle(), " "
 		if i == tb.sel {
 			base = base.Background(t.Surface)
 			mark = fg(t.Accent).Render("▌")
 		}
-		out = append(out, line(tb.row(i, base), base, mark))
+		l := line(tb.row(i, base), base, mark)
+		if bar {
+			l += side[i-first]
+		}
+		out = append(out, l)
+	}
+	return out
+}
+
+// scrollThumb places a scrollbar's thumb on a track of the given length.
+func scrollThumb(track, total, offset int) (start, size int) {
+	size = min(max(track*track/max(total, 1), 1), track)
+	return offset * (track - size) / max(total-track, 1), size
+}
+
+// scrollbar returns one styled cell per track position.
+func scrollbar(t *theme.Theme, track, total, offset int, rail string) []string {
+	start, size := scrollThumb(track, total, offset)
+	out := make([]string, track)
+	for i := range out {
+		if i >= start && i < start+size {
+			out[i] = fg(t.Accent).Render("█")
+		} else {
+			out[i] = fg(t.Border).Render(rail)
+		}
 	}
 	return out
 }

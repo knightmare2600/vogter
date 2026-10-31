@@ -17,6 +17,7 @@ type yAxis int
 const (
 	yPercent yAxis = iota
 	yBits
+	yBytes
 	yPlain
 )
 
@@ -29,6 +30,8 @@ func (y yAxis) label(v float64) string {
 		return fmt.Sprintf("%.0f%%", v)
 	case yBits:
 		return fmtBits(v)
+	case yBytes:
+		return fmtBytes(v)
 	}
 	return fmtNumber(math.Round(v*100) / 100)
 }

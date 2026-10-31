@@ -30,6 +30,7 @@ const (
 	Dashboard View = iota
 	Hosts
 	Problems
+	Boards
 	Host
 )
 
@@ -47,12 +48,13 @@ const (
 	minWidth   = 80
 	minHeight  = 24
 	pageStep   = 10
+	wheelStep  = 3
 	toastLife  = 6 * time.Second
 	maxToasts  = 4
 	ackTimeout = 25 * time.Second
 )
 
-var viewNames = [...]string{"Dashboard", "Hosts", "Problems"}
+var viewNames = [...]string{"Dashboard", "Hosts", "Problems", "Boards"}
 
 var spinner = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
@@ -107,6 +109,9 @@ type Options struct {
 	// Watch selects the host whose detail the poller follows; an empty id
 	// stops it. It must not block.
 	Watch func(hostID string, rangeSecs int64)
+	// WatchBoard makes the poller follow the dashboard list and, with an id,
+	// one dashboard page. It must not block.
+	WatchBoard func(on bool, id string, page int)
 	// WebURL is the frontend base URL.
 	WebURL string
 	// Desktop turns on desktop notifications; MinSeverity filters them
@@ -115,6 +120,8 @@ type Options struct {
 	MinSeverity model.Severity
 	// ASCII replaces every Unicode glyph.
 	ASCII bool
+	// Mouse starts with the wheel scrolling; M toggles it.
+	Mouse bool
 	// Notify and Open reach the desktop.
 	Notify func(title, body string, urgent bool) error
 	Open   func(url string) error
@@ -122,7 +129,7 @@ type Options struct {
 
 // scrolls keeps table offsets. They live behind pointers because rendering
 // updates them, like ratatui's TableState, and View has a value receiver.
-type scrolls struct{ dash, hosts, problems, items *scroller }
+type scrolls struct{ dash, hosts, problems, items, boards *scroller }
 
 // Model is the whole UI state.
 type Model struct {
@@ -154,6 +161,7 @@ type Model struct {
 	minSeverity               model.Severity
 	hideAcked                 bool
 	dashMem                   bool
+	mouse                     bool
 	hostSel, problemSel       int
 
 	backTo     View
@@ -164,6 +172,15 @@ type Model struct {
 	itemFilter string
 	itemSel    int
 
+	boards       []model.Board
+	boardsLoaded bool
+	boardSel     int
+	boardID      string
+	boardPage    int
+	boardScroll  int
+	boardX       int
+	boardData    *model.BoardData
+
 	quitting bool
 }
 
@@ -171,11 +188,12 @@ type Model struct {
 func New(o Options) Model {
 	return Model{
 		opts:      o,
+		mouse:     o.Mouse,
 		theme:     theme.Load(o.Theme),
 		themeName: o.Theme,
 		themeSig:  theme.OmarchySignature(),
 		now:       time.Now,
-		scroll:    scrolls{&scroller{}, &scroller{}, &scroller{}, &scroller{}},
+		scroll:    scrolls{&scroller{}, &scroller{}, &scroller{}, &scroller{}, &scroller{}},
 		loading:   true,
 		hostSort:  model.SortProblems,
 		rangeIdx:  1,
@@ -236,6 +254,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refresh()
 	case tea.KeyPressMsg:
 		return m.onKey(msg)
+	case tea.MouseWheelMsg:
+		m.onWheel(msg)
 	case tea.PasteMsg:
 		m.paste(msg.Content)
 	}
@@ -285,6 +305,12 @@ func (m *Model) onEvent(ev poller.Event) {
 			m.detail = &d
 			m.clampSelection()
 		}
+	case poller.Boards:
+		m.boards, m.boardsLoaded = ev.List, true
+		m.boardSel = min(m.boardSel, max(len(m.boards)-1, 0))
+	case poller.BoardData:
+		d := ev.BoardData
+		m.boardData = &d
 	case poller.Failed:
 		m.loading = false
 		msg := describe(ev.Err)
@@ -329,6 +355,11 @@ func (m Model) webURL() string {
 	switch m.view {
 	case Dashboard:
 		return base + "dashboard.view"
+	case Boards:
+		if m.boardID != "" {
+			return base + "dashboard.view&dashboardid=" + m.boardID
+		}
+		return base + "dashboard.list"
 	case Hosts:
 		if hs := m.filteredHosts(); m.hostSel < len(hs) {
 			return base + "latest.view&" + hostParam + hs[m.hostSel].ID
@@ -417,11 +448,62 @@ func (m *Model) moveSelection(delta int) {
 		m.hostSel = max(min(m.hostSel+delta, len(m.filteredHosts())-1), 0)
 	case Problems:
 		m.problemSel = max(min(m.problemSel+delta, len(m.filteredProblems())-1), 0)
+	case Boards:
+		if m.boardID == "" {
+			m.boardSel = max(min(m.boardSel+delta, len(m.boards)-1), 0)
+			return
+		}
+		g, ok := m.boardGeom()
+		if ok {
+			m.boardScroll = max(min(min(m.boardScroll, g.maxY())+delta, g.maxY()), 0)
+		}
 	case Host:
 		if m.hostTab == tabItems {
 			m.itemSel = max(min(m.itemSel+delta, len(m.filteredItems())-1), 0)
 		}
 	}
+}
+
+// boardGeom lays out the open board for the current screen.
+func (m Model) boardGeom() (boardGeom, bool) {
+	p := m.boardPageNow()
+	if p == nil {
+		return boardGeom{}, false
+	}
+	return boardLayout(p, m.width, max(m.height-headerH-footerH, 0)), true
+}
+
+// page moves by a screenful, or half of one, on an open board, and by the
+// list step everywhere else.
+func (m *Model) page(dir int, half bool) {
+	g, ok := m.boardGeom()
+	if m.view != Boards || m.boardID == "" || !ok {
+		m.moveSelection(dir * pageStep)
+		return
+	}
+	step := max(g.viewH-1, 1)
+	if half {
+		step = max(g.viewH/2, 1)
+	}
+	m.moveSelection(dir * step)
+}
+
+func (m *Model) panBoard(delta int) {
+	if g, ok := m.boardGeom(); ok {
+		m.boardX = max(min(min(m.boardX, g.maxX())+delta, g.maxX()), 0)
+	}
+}
+
+func (m *Model) watchBoard() {
+	if m.opts.WatchBoard != nil {
+		m.opts.WatchBoard(m.view == Boards, m.boardID, m.boardPage)
+	}
+}
+
+func (m *Model) enterBoard(id string, page int) {
+	m.boardID, m.boardPage, m.boardScroll, m.boardX = id, page, 0, 0
+	m.boardData = nil
+	m.watchBoard()
 }
 
 func (m *Model) watch(hostID string) {
@@ -448,7 +530,11 @@ func (m *Model) show(v View) {
 	if m.view == Host && v != Host {
 		m.watch("")
 	}
+	changed := (m.view == Boards) != (v == Boards)
 	m.view = v
+	if changed {
+		m.watchBoard()
+	}
 }
 
 func (m *Model) shiftRange(delta int) {
@@ -456,6 +542,52 @@ func (m *Model) shiftRange(delta int) {
 	if next != m.rangeIdx {
 		m.rangeIdx = next
 		m.watch(m.detailHost)
+	}
+}
+
+func (m *Model) shiftBoardPage(delta int) {
+	b := m.openBoard()
+	if b == nil {
+		return
+	}
+	if next := max(min(m.boardPage+delta, len(b.Pages)-1), 0); next != m.boardPage {
+		m.enterBoard(b.ID, next)
+	}
+}
+
+// onWheel scrolls like j and k. A dialog or filter being typed keeps the
+// wheel from moving the list behind it.
+func (m *Model) onWheel(msg tea.MouseWheelMsg) {
+	if !m.mouse || m.help || m.ack != nil || m.editing {
+		return
+	}
+	sideways := msg.Mod.Contains(tea.ModShift)
+	switch msg.Button {
+	case tea.MouseWheelUp:
+		if sideways {
+			m.panBoard(-boardPanStep)
+		} else {
+			m.moveSelection(-wheelStep)
+		}
+	case tea.MouseWheelDown:
+		if sideways {
+			m.panBoard(boardPanStep)
+		} else {
+			m.moveSelection(wheelStep)
+		}
+	case tea.MouseWheelLeft:
+		m.panBoard(-boardPanStep)
+	case tea.MouseWheelRight:
+		m.panBoard(boardPanStep)
+	}
+}
+
+func (m *Model) toggleMouse() {
+	m.mouse = !m.mouse
+	if m.mouse {
+		m.addToast(toastInfo, "Mouse wheel on", "text selection may need Shift held")
+	} else {
+		m.addToast(toastInfo, "Mouse wheel off", "click and drag selects text again")
 	}
 }
 
@@ -526,14 +658,16 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.show(Hosts)
 	case "3":
 		m.show(Problems)
+	case "4":
+		m.show(Boards)
 	case "tab":
 		if m.view == Host {
 			return m.onViewKey(key)
 		}
-		m.view = (m.view + 1) % 3
+		m.show((m.view + 1) % Host)
 	case "shift+tab":
 		if m.view != Host {
-			m.view = (m.view + 2) % 3
+			m.show((m.view + Host - 1) % Host)
 		}
 	case "r":
 		m.refresh()
@@ -543,6 +677,8 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.addToast(toastInfo, "Theme", m.theme.Name)
 	case "o":
 		m.openBrowser()
+	case "M":
+		m.toggleMouse()
 	case "/":
 		if m.filter() != nil {
 			m.editing = true
@@ -550,6 +686,8 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		if m.view == Host {
 			m.show(m.backTo)
+		} else if m.view == Boards && m.boardID != "" {
+			m.enterBoard("", 0)
 		} else if f := m.filter(); f != nil {
 			*f = ""
 		}
@@ -557,10 +695,14 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.moveSelection(1)
 	case "up", "k":
 		m.moveSelection(-1)
-	case "pgdown", "ctrl+d":
-		m.moveSelection(pageStep)
-	case "pgup", "ctrl+u":
-		m.moveSelection(-pageStep)
+	case "pgdown":
+		m.page(1, false)
+	case "pgup":
+		m.page(-1, false)
+	case "ctrl+d":
+		m.page(1, true)
+	case "ctrl+u":
+		m.page(-1, true)
 	case "g", "home":
 		m.moveSelection(-1 << 30)
 	case "G", "end":
@@ -609,6 +751,25 @@ func (m Model) onViewKey(key string) (tea.Model, tea.Cmd) {
 		case "h":
 			m.hideAcked = !m.hideAcked
 			m.problemSel = 0
+		}
+	case Boards:
+		switch key {
+		case "enter", "l":
+			if m.boardID == "" {
+				if m.boardSel < len(m.boards) {
+					m.enterBoard(m.boards[m.boardSel].ID, 0)
+				}
+			} else if key == "l" {
+				m.panBoard(boardPanStep)
+			}
+		case "right":
+			m.panBoard(boardPanStep)
+		case "h", "left":
+			m.panBoard(-boardPanStep)
+		case "[":
+			m.shiftBoardPage(-1)
+		case "]":
+			m.shiftBoardPage(1)
 		}
 	case Host:
 		switch key {
@@ -682,6 +843,9 @@ func (m Model) View() tea.View {
 	}
 	v := tea.NewView(screen)
 	v.AltScreen = true
+	if m.mouse {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
 	v.WindowTitle = "vogter · " + m.opts.Profile
 	return v
 }
@@ -702,6 +866,8 @@ func (m Model) render() string {
 		body = m.dashboard(m.width, bodyH)
 	case m.view == Hosts:
 		body = m.hostsView(m.width, bodyH)
+	case m.view == Boards:
+		body = m.boardsView(m.width, bodyH)
 	case m.view == Host:
 		body = m.hostView(m.width, bodyH)
 	default:
@@ -766,7 +932,7 @@ func (m Model) header() string {
 	t := &m.theme
 	s := lipgloss.NewStyle()
 	left := []string{s.Foreground(t.BG).Background(t.Accent).Bold(true).Render(" ◆ vogter "), "  "}
-	counts := [3]string{}
+	counts := [len(viewNames)]string{}
 	countColour := t.OK
 	if m.snapshot != nil {
 		st := model.Summarise(m.snapshot)
@@ -790,6 +956,13 @@ func (m Model) header() string {
 			c = countColour
 		}
 		left = append(left, s.Foreground(t.Border).Render(fmt.Sprintf("%d ", i+1)), st.Render(name), s.Foreground(c).Bold(true).Render(counts[i]), "   ")
+	}
+	if b := m.openBoard(); m.view == Boards && b != nil {
+		name := b.Name
+		if n := len(b.Pages); n > 1 {
+			name += fmt.Sprintf(" (page %d/%d)", m.boardPage+1, n)
+		}
+		left = append(left, fg(t.Border).Render("› "), fg(t.Accent).Bold(true).Underline(true).Render(name))
 	}
 	if m.view == Host {
 		name := ""
@@ -837,7 +1010,7 @@ func (m Model) header() string {
 			break
 		}
 	}
-	gap := max(m.width-lipgloss.Width(l)-lipgloss.Width(r), 0)
+	gap := max(m.width-lipgloss.Width(l)-lipgloss.Width(r), 2)
 	return l + strings.Repeat(" ", gap) + r + "\n"
 }
 
@@ -847,6 +1020,11 @@ func (m Model) hints() [][2]string {
 		return [][2]string{{"j/k", "move"}, {"⏎", "open"}, {"/", "filter"}, {"s", "sort"}, {"o", "web"}, {"r", "refresh"}, {"?", "help"}}
 	case Problems:
 		return [][2]string{{"j/k", "move"}, {"a", "ack"}, {"⏎", "host"}, {"+/-", "severity"}, {"h", "hide acked"}, {"/", "filter"}, {"?", "help"}}
+	case Boards:
+		if m.boardID == "" {
+			return [][2]string{{"j/k", "move"}, {"⏎", "open"}, {"o", "web"}, {"r", "refresh"}, {"?", "help"}}
+		}
+		return [][2]string{{"esc", "back"}, {"j/k", "scroll"}, {"h/l", "pan"}, {"pgup/pgdn", "page"}, {"[ ]", "tab"}, {"o", "web"}, {"?", "help"}}
 	}
 	if m.view == Host {
 		if m.hostTab == tabItems {
@@ -927,10 +1105,11 @@ func (m Model) helpBox() string {
 		name string
 		keys [][2]string
 	}{
-		{"Global", [][2]string{{"1 2 3 / tab", "switch view"}, {"r", "refresh now"}, {"t", "cycle theme"}, {"o", "open in Zabbix web"}, {"?", "this help"}, {"q", "quit"}}},
+		{"Global", [][2]string{{"1 2 3 4 / tab", "switch view"}, {"r", "refresh now"}, {"t", "cycle theme"}, {"M", "mouse wheel on / off"}, {"o", "open in Zabbix web"}, {"?", "this help"}, {"q", "quit"}}},
 		{"Lists", [][2]string{{"j k ↑ ↓", "move"}, {"g G", "top / bottom"}, {"ctrl-d ctrl-u", "page"}, {"/", "filter"}, {"⏎", "drill into host"}}},
 		{"Problems", [][2]string{{"a", "acknowledge (+ message, close)"}, {"+ -", "minimum severity"}, {"h", "hide acknowledged"}}},
 		{"Host", [][2]string{{"[ ]", "time range 15m → 7d"}, {"tab", "graphs / latest data"}, {"esc", "back"}}},
+		{"Boards", [][2]string{{"⏎", "open a Zabbix dashboard"}, {"j k h l", "scroll and pan"}, {"pgup pgdn", "screen"}, {"ctrl-d ctrl-u", "half screen"}, {"g G", "top / bottom"}, {"[ ]", "dashboard page"}, {"esc", "back"}}},
 	}
 	lines := []string{""}
 	for _, sec := range sections {

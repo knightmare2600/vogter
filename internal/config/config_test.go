@@ -335,3 +335,9 @@ func TestImport(t *testing.T) {
 		t.Error("missing source accepted")
 	}
 }
+
+func TestMouseDefaultsOff(t *testing.T) {
+	if defaults().Mouse {
+		t.Error("the mouse must stay off unless asked for")
+	}
+}

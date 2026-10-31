@@ -26,6 +26,10 @@ theme = "auto"
 # Seconds between API polls (minimum 2).
 refresh_interval = 10
 
+# Scroll with the mouse wheel. Off by default, because taking the mouse stops
+# click-and-drag text selection in most terminals. M toggles it while running.
+mouse = false
+
 [notifications]
 # Desktop notifications (notify-send on Linux, Notification Center on macOS)
 # for new and resolved problems and for hosts going down or coming back.

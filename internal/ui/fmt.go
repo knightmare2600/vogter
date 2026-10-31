@@ -124,6 +124,10 @@ func fmtItemValue(it zabbix.Item, now time.Time) string {
 }
 
 func fmtUnits(v float64, units string, now time.Time) string {
+	// A leading ! tells Zabbix to show the unit as it is, without conversion.
+	if raw, ok := strings.CutPrefix(units, "!"); ok {
+		return strings.TrimSpace(fmtNumber(v) + " " + raw)
+	}
 	switch units {
 	case "B":
 		return fmtBytes(v)

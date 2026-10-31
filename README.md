@@ -35,7 +35,13 @@ VOGTER_URL=https://zabbix.example.com VOGTER_TOKEN=... bin/vogter
 
 Coming from zabterm? `bin/vogter import` copies your config across.
 
+Press `4` for Boards: your Zabbix global dashboards, read-only. Widgets a terminal cannot draw, such as maps, show a
+placeholder, and `o` opens the page in Zabbix. See `docs/compatibility.md`.
+
 Options: `-p NAME` picks a profile, `-c PATH` uses another config file, `-t THEME` overrides the theme.
+
+The mouse wheel is off by default, because taking the mouse stops click-and-drag text selection. Set `mouse = true` in
+the config, or press `M` while running. Lists scroll with `j k`, page up and down, and `ctrl-d ctrl-u`.
 
 Credentials are tried in this order: `VOGTER_TOKEN`, `token_env`, `token_cmd`, `token`, then
 `username`/`password`.

@@ -26,6 +26,7 @@ type Config struct {
 	DefaultProfile  string              `toml:"default_profile"`
 	Theme           string              `toml:"theme"`
 	RefreshInterval int                 `toml:"refresh_interval"`
+	Mouse           bool                `toml:"mouse"`
 	Notifications   Notifications       `toml:"notifications"`
 	Profiles        map[string]*Profile `toml:"profiles"`
 

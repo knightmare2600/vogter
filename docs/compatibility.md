@@ -80,6 +80,32 @@ or Homebrew tap. Release archives hold the binary, licences and a `.desktop` fil
 `.github/workflows/ci.yml` runs the tests on Linux, macOS and Windows once the repository is on GitHub. It
 has not run yet, and CI does not exercise a real terminal.
 
+## Scrollbars and mouse
+
+Vogter adds a scrollbar to any table that overflows; a table that fits looks as it does in zabterm. The mouse wheel is
+an addition, off by default: `mouse = true` in the config or `M` while running. `Shift` plus the wheel pans a board
+where the terminal passes that through.
+
+## Zabbix dashboards
+
+The `4 Boards` screen is new in Vogter; zabterm has no equivalent, so it adds a fourth tab to the header. It is read-only
+and only calls the API while open. Read through `dashboard.get`, global dashboards only, on the 72-column grid. The layout
+is always Zabbix's: a terminal narrower than 120 columns or too short for the page becomes a window onto it, with
+scrollbars, `j k h l`, page up and down, and `ctrl-d ctrl-u`.
+
+| Widget | Drawn as |
+|---|---|
+| `svggraph` | Braille chart. Item patterns and item lists are read. At most 12 series, the rest counted in the frame. Theme colours replace Zabbix's. `now-Nh` style periods only, otherwise 1h |
+| `problems`, `problemsbysv` | Active problems, honouring `hostids` and `severities`. Other filters, such as groups and tags, are not applied |
+| `clock` | Digital, always the local time of the terminal |
+| `item` | Last value and description |
+| `hostavail` | Interface counts of the chosen type |
+| `tophosts` | Table by item name, sorted by the chosen column. Thresholds and bars are not drawn; columns that do not fit are dropped |
+| `systeminfo` | Version and object counts. "Server is running" and required performance have no API |
+| `geomap`, `map`, anything else | A placeholder pointing at the web page (`o`) |
+
+Template dashboards are not read.
+
 ## Verified against a real server
 
 Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`:
@@ -89,13 +115,17 @@ Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`
 - Dashboard, hosts, problems, latest data, acknowledge, and graphs at 1h, 24h and 7d (trends).
 - Discovered `net.if` and `vfs.fs.dependent.size` keys, including a real ext4-backed `/data` mount in the filesystems
   panel. The agent's `/etc/*` container mounts were excluded as designed.
+- `4 Boards` on the stock `Global view`, `Zabbix server health` and `Zabbix server` dashboards, at 150×45 and 80×24, including scrolling both ways.
 - An expired password session: one poll showed offline, then Vogter logged in again unaided.
 - Real wording of authentication and permission errors, from `host.get`, `user.login`, `event.acknowledge` and
   `host.create`, is classified correctly.
 
 ## Not verified
 
-- Zabbix 6.4 and 8.0 have not run against a real server.
+- Zabbix 6.4 and 8.0 have not run against a real server, including `4 Boards`.
+- `svggraph` datasets that list item ids rather than patterns: unit-tested only, as the default dashboards use patterns.
+- `tophosts` matches items by name, tested with one host. The lab's fed hosts use different item names.
+- `dashboard.get` on an account with a large number of dashboards.
 - Desktop notifications driven by a real server; they were tested on the mock.
 - Omarchy 4 support is tested against files in its v4.0.6 format, not on an Omarchy machine.
 - `osascript` argument passing has not run on macOS.

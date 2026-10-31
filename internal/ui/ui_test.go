@@ -88,6 +88,10 @@ func keyMsg(k string) tea.KeyPressMsg {
 		return tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	case "ctrl+d":
 		return tea.KeyPressMsg{Code: 'd', Mod: tea.ModCtrl}
+	case "ctrl+u":
+		return tea.KeyPressMsg{Code: 'u', Mod: tea.ModCtrl}
+	case "pgup":
+		return tea.KeyPressMsg{Code: tea.KeyPgUp}
 	case "space":
 		return tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 	}
@@ -130,8 +134,8 @@ func TestViewNavigation(t *testing.T) {
 		key  string
 		want View
 	}{
-		{"2", Hosts}, {"3", Problems}, {"1", Dashboard}, {"tab", Hosts}, {"tab", Problems}, {"tab", Dashboard},
-		{"shift+tab", Problems}, {"shift+tab", Hosts},
+		{"2", Hosts}, {"3", Problems}, {"1", Dashboard}, {"tab", Hosts}, {"tab", Problems}, {"tab", Boards}, {"tab", Dashboard},
+		{"shift+tab", Boards}, {"shift+tab", Problems}, {"4", Boards},
 	}
 	for _, s := range steps {
 		m, _ = press(m, s.key)

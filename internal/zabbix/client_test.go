@@ -294,3 +294,63 @@ func TestErrorStringHasNoToken(t *testing.T) {
 		t.Error("token leaked into error text")
 	}
 }
+
+func TestDashboardsDecode(t *testing.T) {
+	f := &fake{results: map[string]string{"dashboard.get": `[{"dashboardid":"1","name":"Global view","pages":[{"name":"","widgets":[
+		{"type":"clock","name":"Local time","x":"60","y":"0","width":"12","height":"4","fields":[{"type":"0","name":"time_sec","value":"1"}]}]}]}]`}}
+	c := newFake(t, f)
+	got, err := c.Dashboards(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := got[0].Pages[0].Widgets[0]
+	if w.Type != "clock" || w.X != "60" || w.Fields[0].Value != "1" {
+		t.Fatalf("%+v", got)
+	}
+	if f.calls[0].Params["selectPages"] != "extend" {
+		t.Errorf("%+v", f.calls[0].Params)
+	}
+}
+
+func TestDashboardMissingIDIsRejected(t *testing.T) {
+	f := &fake{results: map[string]string{"dashboard.get": `[{"name":"x"}]`}}
+	if _, err := newFake(t, f).Dashboards(context.Background()); err == nil {
+		t.Fatal("want a shape error")
+	}
+}
+
+func TestItemSelectionParams(t *testing.T) {
+	f := &fake{results: map[string]string{"item.get": `[]`}}
+	c := newFake(t, f)
+	ctx := context.Background()
+	if _, err := c.ItemsMatching(ctx, []string{"1"}, []string{"*cache*"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.ItemsNamed(ctx, nil, []string{"CPU"}); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := c.ItemsByID(ctx, nil); got != nil || err != nil {
+		t.Fatalf("no ids needs no call: %v %v", got, err)
+	}
+	if len(f.calls) != 2 || f.calls[0].Params["searchWildcardsEnabled"] != true {
+		t.Fatalf("%+v", f.calls)
+	}
+	if _, has := f.calls[1].Params["hostids"]; has {
+		t.Error("nil hosts must not send hostids")
+	}
+}
+
+func TestCount(t *testing.T) {
+	f := &fake{results: map[string]string{"template.get": `"356"`, "item.get": `"190"`}}
+	c := newFake(t, f)
+	ctx := context.Background()
+	if n, err := c.Count(ctx, "template.get"); n != "356" || err != nil {
+		t.Fatalf("%q %v", n, err)
+	}
+	if n, err := c.Count(ctx, "item.get"); n != "190" || err != nil {
+		t.Fatalf("%q %v", n, err)
+	}
+	if f.calls[1].Params["templated"] != false {
+		t.Errorf("template items must not count: %+v", f.calls[1].Params)
+	}
+}

@@ -34,6 +34,10 @@ type fakeAPI struct {
 	trends       []zabbix.TrendPoint
 	trendErr     error
 	trendFrom    []int64
+	hosts        []zabbix.Host
+	boards       []zabbix.Dashboard
+	boardErr     error
+	boardItems   []zabbix.Item
 }
 
 func (f *fakeAPI) log(s string) { f.mu.Lock(); f.calls = append(f.calls, s); f.mu.Unlock() }
@@ -60,6 +64,40 @@ func (f *fakeAPI) Logout(context.Context) error {
 
 func (f *fakeAPI) SetToken(string) { f.log("token") }
 
+func (f *fakeAPI) ItemsByID(_ context.Context, ids []string) ([]zabbix.Item, error) {
+	f.log("itemsbyid")
+	var out []zabbix.Item
+	for _, it := range f.boardItems {
+		if slices.Contains(ids, it.ItemID) {
+			out = append(out, it)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeAPI) ItemsMatching(context.Context, []string, []string) ([]zabbix.Item, error) {
+	f.log("itemsmatching")
+	return f.boardItems, nil
+}
+
+func (f *fakeAPI) ItemsNamed(context.Context, []string, []string) ([]zabbix.Item, error) {
+	f.log("itemsnamed")
+	return f.boardItems, nil
+}
+
+func (f *fakeAPI) Dashboards(context.Context) ([]zabbix.Dashboard, error) {
+	f.log("dashboards")
+	return f.boards, f.boardErr
+}
+
+func (f *fakeAPI) Count(_ context.Context, method string) (string, error) {
+	f.log("count")
+	if method == "user.get" {
+		return "", errors.New("denied")
+	}
+	return "7", nil
+}
+
 func (f *fakeAPI) APIVersion(context.Context) (string, error) {
 	f.log("version")
 	return f.version, nil
@@ -73,6 +111,9 @@ func (f *fakeAPI) Hosts(context.Context) ([]zabbix.Host, error) {
 		err := f.hostErrs[0]
 		f.hostErrs = f.hostErrs[1:]
 		return nil, err
+	}
+	if f.hosts != nil {
+		return f.hosts, nil
 	}
 	return []zabbix.Host{{HostID: "1"}}, nil
 }

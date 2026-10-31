@@ -23,6 +23,8 @@ tools/compare.sh    drives a binary under tmux for screen and request comparison
    └──────────── events (Connected | Snapshot | Failed) ◄┘
 ```
 
+- `poller.boardLoop` runs beside the poll and detail loops. It follows the Boards screen and makes no call while that
+  screen is closed. Its widgets fail one at a time, so a failed widget does not blank the page.
 - `poller.Run` polls once at start, then every `refresh_interval` and on each `Refresh`. Requests that
   arrive during a poll become one follow-up poll.
 - The UI waits for events in a `tea.Cmd` and re-arms after each one, so rendering and key handling

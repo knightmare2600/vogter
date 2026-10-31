@@ -118,6 +118,36 @@ type TrendPoint struct {
 	ValueMax string `json:"value_max"`
 }
 
+// Dashboard is a dashboard.get result row with its pages selected.
+type Dashboard struct {
+	DashboardID string          `json:"dashboardid"`
+	Name        string          `json:"name"`
+	Pages       []DashboardPage `json:"pages"`
+}
+
+// DashboardPage is one page of a dashboard.
+type DashboardPage struct {
+	Name    string   `json:"name"`
+	Widgets []Widget `json:"widgets"`
+}
+
+// Widget sits on a grid 72 columns wide.
+type Widget struct {
+	Type   string        `json:"type"`
+	Name   string        `json:"name"`
+	X      string        `json:"x"`
+	Y      string        `json:"y"`
+	Width  string        `json:"width"`
+	Height string        `json:"height"`
+	Fields []WidgetField `json:"fields"`
+}
+
+// WidgetField is one setting of a widget.
+type WidgetField struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
+}
+
 // Result slices check their required fields after decoding.
 
 type hostList []Host
@@ -126,6 +156,7 @@ type triggerList []Trigger
 type itemList []Item
 type historyList []HistoryPoint
 type trendList []TrendPoint
+type dashboardList []Dashboard
 
 func required(what string, i int, fields ...string) error {
 	for _, f := range fields {
@@ -184,6 +215,15 @@ func (l historyList) validate() error {
 func (l trendList) validate() error {
 	for i, p := range l {
 		if err := required("trend point", i, p.ItemID, p.Clock); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l dashboardList) validate() error {
+	for i, d := range l {
+		if err := required("dashboard", i, d.DashboardID); err != nil {
 			return err
 		}
 	}

@@ -102,6 +102,71 @@ func (c *Client) HostItems(ctx context.Context, hostID string) ([]Item, error) {
 	return only(out, err)
 }
 
+// ItemsByID returns the given items.
+func (c *Client) ItemsByID(ctx context.Context, itemIDs []string) ([]Item, error) {
+	if len(itemIDs) == 0 {
+		return nil, nil
+	}
+	var out itemList
+	err := c.Call(ctx, "item.get", map[string]any{"itemids": itemIDs, "output": itemOutput}, &out)
+	return only(out, err)
+}
+
+// ItemsMatching returns monitored items on hostIDs whose name matches any of
+// patterns, in which * is a wildcard, as a dashboard graph selects them.
+func (c *Client) ItemsMatching(ctx context.Context, hostIDs, patterns []string) ([]Item, error) {
+	var out itemList
+	err := c.Call(ctx, "item.get", map[string]any{
+		"hostids":                hostIDs,
+		"output":                 itemOutput,
+		"search":                 map[string]any{"name": patterns},
+		"searchByAny":            true,
+		"searchWildcardsEnabled": true,
+		"monitored":              true,
+		"sortfield":              "name",
+	}, &out)
+	return only(out, err)
+}
+
+// ItemsNamed returns monitored items named exactly one of names, on all
+// hosts when hostIDs is nil.
+func (c *Client) ItemsNamed(ctx context.Context, hostIDs, names []string) ([]Item, error) {
+	p := map[string]any{
+		"output":    itemOutput,
+		"filter":    map[string]any{"name": names},
+		"monitored": true,
+	}
+	if hostIDs != nil {
+		p["hostids"] = hostIDs
+	}
+	var out itemList
+	err := c.Call(ctx, "item.get", p, &out)
+	return only(out, err)
+}
+
+// Dashboards returns the global dashboards the account can see, with their
+// pages and widgets.
+func (c *Client) Dashboards(ctx context.Context) ([]Dashboard, error) {
+	var out dashboardList
+	err := c.Call(ctx, "dashboard.get", map[string]any{
+		"output":      []string{"dashboardid", "name"},
+		"selectPages": "extend",
+		"sortfield":   "name",
+	}, &out)
+	return only(out, err)
+}
+
+// Count runs a counting get on method, such as template.get.
+func (c *Client) Count(ctx context.Context, method string) (string, error) {
+	p := map[string]any{"countOutput": true}
+	if method == "item.get" || method == "trigger.get" {
+		p["templated"] = false
+	}
+	var n string
+	err := c.Call(ctx, method, p, &n)
+	return only(n, err)
+}
+
 // History returns values of one value type (history.get accepts a single
 // type per call) received at or after from, oldest first.
 func (c *Client) History(ctx context.Context, itemIDs []string, valueType int, from int64) ([]HistoryPoint, error) {

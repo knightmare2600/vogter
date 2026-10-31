@@ -38,6 +38,11 @@ type API interface {
 	History(ctx context.Context, itemIDs []string, valueType int, from int64) ([]zabbix.HistoryPoint, error)
 	Trends(ctx context.Context, itemIDs []string, from int64) ([]zabbix.TrendPoint, error)
 	HostItems(ctx context.Context, hostID string) ([]zabbix.Item, error)
+	ItemsByID(ctx context.Context, itemIDs []string) ([]zabbix.Item, error)
+	ItemsMatching(ctx context.Context, hostIDs, patterns []string) ([]zabbix.Item, error)
+	ItemsNamed(ctx context.Context, hostIDs, names []string) ([]zabbix.Item, error)
+	Dashboards(ctx context.Context) ([]zabbix.Dashboard, error)
+	Count(ctx context.Context, method string) (string, error)
 	Acknowledge(ctx context.Context, eventIDs []string, message string, close bool) error
 }
 
@@ -64,12 +69,20 @@ type Snapshot struct{ model.Snapshot }
 // Detail is one fetch of the watched host.
 type Detail struct{ model.HostDetail }
 
+// Boards lists the dashboards.
+type Boards struct{ List []model.Board }
+
+// BoardData is one fetch of the open dashboard page.
+type BoardData struct{ model.BoardData }
+
 // Failed reports an error; the next trigger retries.
 type Failed struct{ Err error }
 
 func (Connected) isEvent() {}
 func (Snapshot) isEvent()  {}
 func (Detail) isEvent()    {}
+func (Boards) isEvent()    {}
+func (BoardData) isEvent() {}
 func (Failed) isEvent()    {}
 
 // Poller runs the poll loop.
@@ -89,11 +102,13 @@ type Poller struct {
 	mu         sync.Mutex
 	watching   watch
 	detailPoke chan struct{}
+	boarding   boardWatch
+	boardPoke  chan struct{}
 }
 
 // New builds a poller.
 func New(api API, auth config.Auth, interval time.Duration, f Fmt) *Poller {
-	return &Poller{API: api, Auth: auth, Interval: interval, Fmt: f, Now: time.Now, detailPoke: make(chan struct{}, 1)}
+	return &Poller{API: api, Auth: auth, Interval: interval, Fmt: f, Now: time.Now, detailPoke: make(chan struct{}, 1), boardPoke: make(chan struct{}, 1)}
 }
 
 // Acknowledge runs outside the poll loop, so it does not wait behind a slow
@@ -108,8 +123,9 @@ func (p *Poller) Acknowledge(ctx context.Context, eventIDs []string, message str
 // one follow-up poll. On exit it closes any user.login session.
 func (p *Poller) Run(ctx context.Context, cmds <-chan Cmd, events chan<- Event) {
 	var wg sync.WaitGroup
-	wg.Add(1)
+	wg.Add(2)
 	go func() { defer wg.Done(); p.detailLoop(ctx, events) }()
+	go func() { defer wg.Done(); p.boardLoop(ctx, events) }()
 	defer wg.Wait()
 	defer func() {
 		lctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -122,6 +138,7 @@ func (p *Poller) Run(ctx context.Context, cmds <-chan Cmd, events chan<- Event) 
 	for {
 		p.poll(ctx, events)
 		p.pokeDetail()
+		p.pokeBoard()
 		// Drain anything that queued up during the poll: one follow-up
 		// poll covers all of it.
 		pending := false
