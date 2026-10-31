@@ -279,6 +279,9 @@ func failAPI(w io.Writer, err error) int {
 	return 1
 }
 
+// asciiMode reports whether VOGTER_ASCII asks for ASCII glyphs only.
+func asciiMode() bool { return os.Getenv(config.EnvASCII) == "1" }
+
 // colourProfile applies VOGTER_TRUECOLOR. Otherwise Bubble Tea detects the
 // terminal, and that detection honours NO_COLOR, which therefore wins here.
 func colourProfile() []tea.ProgramOption {
@@ -330,6 +333,7 @@ func tui(o options, path string, stderr io.Writer) int {
 		Theme:       themeName,
 		Interval:    interval,
 		Mouse:       c.Mouse,
+		ASCII:       asciiMode(),
 		Events:      events,
 		Cmds:        cmds,
 		Ack:         pl.Acknowledge,

@@ -188,3 +188,14 @@ func TestLicences(t *testing.T) {
 		}
 	}
 }
+
+func TestASCIIMode(t *testing.T) {
+	t.Setenv(config.EnvASCII, "")
+	if asciiMode() {
+		t.Error("ASCII mode must be opt-in")
+	}
+	t.Setenv(config.EnvASCII, "1")
+	if !asciiMode() {
+		t.Error("VOGTER_ASCII=1 ignored")
+	}
+}
