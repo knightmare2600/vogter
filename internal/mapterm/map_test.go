@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -280,8 +281,12 @@ func TestDiskCacheAndOfflineStart(t *testing.T) {
 		t.Error("offline reads must come from disk")
 	}
 	info, err := os.Stat(filepath.Join(dir, "tilejson.json"))
-	if err != nil || info.Mode().Perm()&0o077 != 0 {
-		t.Errorf("metadata saved privately: %v", err)
+	if err != nil {
+		t.Fatalf("metadata saved: %v", err)
+	}
+	// Windows has no Unix permission bits; its files report 0666.
+	if runtime.GOOS != "windows" && info.Mode().Perm()&0o077 != 0 {
+		t.Errorf("metadata must be private: %v", info.Mode().Perm())
 	}
 }
 
