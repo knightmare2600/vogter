@@ -121,7 +121,11 @@ Vægter does not geocode. A host with only a city in its inventory is counted on
 
 Shapes differ by status, so colour is never the only cue. ASCII mode uses `@ ^ # o`.
 
-The Boards screen's `geomap` widget draws the same map at the widget's saved view, with the hosts it names.
+The Boards screen's `geomap` widget draws the same map, with the hosts it names. A terminal panel has far fewer
+dots than the same widget has pixels in a browser, so drawing at the saved zoom would show only a small patch. The
+widget therefore covers the area the browser shows, presuming a dashboard 1,800 pixels wide, and draws the streets
+and names the browser would at its zoom. Buildings need the widget's own zoom to reach 15, and minor street names
+14.5; any further out, they would fill the panel solid. Without a saved view, the widget fits its hosts.
 
 ## Palettes
 
@@ -157,9 +161,17 @@ tile loads, a cached one from up to three zooms lower stands in, enlarged. Tiles
 failed tile waits 30 seconds before it is asked for again. The last frame is reused until the view, the settings or
 the tiles change, and markers are drawn over a copy, so a blinking marker never redraws the map.
 
-Zooms beyond the source's deepest level, 14 for OpenFreeMap, enlarge zoom 14 tiles up to zoom 19. Buildings show
-from zoom 16, minor roads from 14, and paths and service roads from 16. Names of main roads show from zoom 14,
-other street names from 15.5, and water names from 13.
+Water is drawn as its shore, never filled: open sea filled with texture is the busiest part of any map that shows it.
+Land is textured instead, below zoom 9, so continents read against the sea; the schema has no land shapes, so a tile's
+square and its water are filled together by the even-odd rule, which leaves the land. Outlines are not drawn where a
+polygon was cut at its tile's edge. Only town parks, gardens and woods are textured: meadows, farmland and wetland
+cover most of the countryside, and the schema's `park` layer is protected areas, many of them at sea, such as the
+wildlife reserve over Odense Fjord. Borders at sea are left out, and state borders wait for zoom 5.
+
+Zooms beyond the source's deepest level, 14 for OpenFreeMap, enlarge zoom 14 tiles up to zoom 19. Streets and
+pedestrian streets show from zoom 14, service roads from 15, and buildings, footpaths, cycleways and steps from 16.
+Names of main roads show from zoom 14, other street names from 15.5, and water names from 13. Pedestrian streets
+count as streets, because in an old town centre such as Odense's they are most of the streets.
 
 ## Caching and offline use
 

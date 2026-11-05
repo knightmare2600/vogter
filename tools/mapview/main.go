@@ -23,6 +23,7 @@ func main() {
 	modeName := flag.String("mode", "braille", "braille, unicode or ascii")
 	paletteName := flag.String("palette", "green", "palette name")
 	labels := flag.Bool("labels", true, "show names")
+	detail := flag.Float64("detail", 0, "draw as this many zooms closer would")
 	flag.String("cache", "", "disk cache directory")
 	flag.String("url", mapterm.OpenFreeMap, "TileJSON URL")
 	flag.Parse()
@@ -37,6 +38,7 @@ func main() {
 	loader := mapterm.NewLoader(src, 4_000_000)
 	m := mapterm.New(mapterm.LatLon{Lat: *lat, Lon: *lon}, *zoom)
 	m.SetSize(*cols, *rows)
+	m.Detail = *detail
 	_, missing := m.Render(src.MaxZoom(), loader.Version(), loader.Lookup)
 	fetchStart := time.Now()
 	var wg sync.WaitGroup
@@ -79,5 +81,12 @@ func main() {
 		}
 	}
 	fmt.Fprintf(os.Stderr, "label-cells=%d ", placed)
+	counts := map[mapterm.Class]int{}
+	for _, c := range frame.Cells {
+		if c.R != ' ' && !c.Label {
+			counts[c.Class]++
+		}
+	}
+	fmt.Fprintf(os.Stderr, "classes=%v ", counts)
 	fmt.Fprintf(os.Stderr, "%s  tiles=%d fetch=%s draw=%s missing=%d\n", mapterm.Attribution, len(missing), fetched.Round(time.Millisecond), took.Round(time.Microsecond), len(left))
 }

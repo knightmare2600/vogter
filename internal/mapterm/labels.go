@@ -32,7 +32,8 @@ var placeMinZoom = map[string]float64{
 // CollectLabels gathers names from the tiles a view uses: places, then water
 // and road names at street zooms.
 func CollectLabels(v View, maxZoom int, lookup Lookup) []Label {
-	z := DataZoom(v.Zoom, maxZoom)
+	z := DataZoom(v.DetailZoom(), maxZoom)
+	dz := v.DetailZoom()
 	var out []Label
 	for _, id := range v.Tiles(z) {
 		t, ok := lookup(id)
@@ -48,7 +49,7 @@ func CollectLabels(v View, maxZoom int, lookup Lookup) []Label {
 			for _, f := range l.Features {
 				class := str(&f, "class")
 				rank, ok := placeRank[class]
-				if !ok || v.Zoom < placeMinZoom[class] || len(f.Geometry) == 0 || len(f.Geometry[0]) == 0 {
+				if !ok || dz < placeMinZoom[class] || len(f.Geometry) == 0 || len(f.Geometry[0]) == 0 {
 					continue
 				}
 				if name := name(&f); name != "" {
@@ -72,7 +73,7 @@ func CollectLabels(v View, maxZoom int, lookup Lookup) []Label {
 			}
 			return bx, by, !math.IsInf(best, 1)
 		}
-		if v.Zoom >= 13 {
+		if dz >= 13 {
 			if l := t.Layers["water_name"]; l != nil {
 				for _, f := range l.Features {
 					if name := name(&f); name != "" && len(f.Geometry) > 0 {
@@ -83,7 +84,7 @@ func CollectLabels(v View, maxZoom int, lookup Lookup) []Label {
 				}
 			}
 		}
-		if v.Zoom >= 14 {
+		if dz >= 14 {
 			if l := t.Layers["transportation_name"]; l != nil {
 				for _, f := range l.Features {
 					name := name(&f)
@@ -93,7 +94,7 @@ func CollectLabels(v View, maxZoom int, lookup Lookup) []Label {
 					rank := 14
 					if c := str(&f, "class"); c == "primary" || c == "secondary" || c == "trunk" || c == "motorway" {
 						rank = 12
-					} else if v.Zoom < 15.5 {
+					} else if dz < 15.5 || v.Zoom < MinStreetNameZoom {
 						continue
 					}
 					for _, part := range f.Geometry {

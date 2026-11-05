@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
 
@@ -425,28 +426,62 @@ func (m *Model) geomapWidgets() map[int]*mapterm.Map {
 		}
 		key := fmt.Sprintf("%s/%d/%d", m.boardID, m.boardPage, c.index)
 		gm := s.widgets[key]
+		cols, rows := max(c.w-2, 1), max(c.h-3, 1) // the bottom row shows the credit
 		if gm == nil {
-			center, zoom := geomapView(wg.Get("default_view"))
-			gm = mapterm.New(center, zoom)
-			gm.Palette, gm.Labels = s.main.Palette, true
-			if m.opts.ASCII {
-				gm.Mode = mapterm.ModeASCII
-			}
+			gm = m.newGeomap(wg, cols, rows)
 			s.widgets[key] = gm
 		}
-		// The bottom row of the frame shows the credit.
-		gm.SetSize(max(c.w-2, 1), max(c.h-3, 1))
+		gm.SetSize(cols, rows)
 		out[c.index] = gm
 	}
 	return out
 }
 
-// geomapView reads a widget's "lat,lon,zoom" view, as Zabbix stores it.
-func geomapView(v string) (mapterm.LatLon, float64) {
-	if at, zoom, err := parseCoords(v, 3); err == nil {
-		return at, zoom
+// webDashboardWidth is the width in pixels presumed for a Zabbix dashboard
+// in a browser, a full HD screen less its margins. Zabbix stores widget sizes
+// only in grid columns, so the real width is not known.
+const webDashboardWidth = 1800
+
+// geomapZoom turns a zoom chosen in a browser into one showing the same
+// ground in a terminal widget, whose dots are far fewer than the browser's
+// pixels across the same widget.
+func geomapZoom(webZoom float64, gridWidth, dots int) float64 {
+	webPixels := float64(gridWidth) / model.GridColumns * webDashboardWidth
+	if dots <= 0 || webPixels <= float64(dots) {
+		return webZoom
 	}
-	return mapterm.LatLon{Lat: 30}, 1
+	return max(webZoom-math.Log2(webPixels/float64(dots)), mapterm.MinZoom)
+}
+
+// newGeomap opens a widget's map where Zabbix would: at its initial view,
+// zoomed out to show the same ground, or, without one, around its hosts.
+// Zabbix's documented default zoom is half the provider's deepest.
+func (m *Model) newGeomap(wg model.Widget, cols, rows int) *mapterm.Map {
+	s := m.maps
+	gm := mapterm.New(mapterm.LatLon{Lat: 30}, 1)
+	gm.Palette, gm.Labels = s.main.Palette, true
+	if m.opts.ASCII {
+		gm.Mode = mapterm.ModeASCII
+	}
+	gm.SetSize(cols, rows)
+	dots := cols * mapterm.CellW
+	if at, zoom, err := parseCoords(wg.Get("default_view"), math.NaN()); err == nil {
+		if math.IsNaN(zoom) {
+			zoom = float64(s.source.MaxZoom()) / 2
+		}
+		// Cover the browser's area, and draw what the browser would at its
+		// zoom: the same tiles, streets, buildings and names.
+		fitted := geomapZoom(zoom, wg.W, dots)
+		gm.GoTo(at, fitted)
+		gm.Detail = zoom - fitted
+		return gm
+	}
+	var pts []mapterm.LatLon
+	for _, mk := range widgetMarkers(s.markers, wg.All("hostids")) {
+		pts = append(pts, mk.Pos)
+	}
+	gm.Fit(pts, mapFitMaxZoom)
+	return gm
 }
 
 func (m Model) geomapLines(index int, wg model.Widget, w, h int) ([]string, bool) {

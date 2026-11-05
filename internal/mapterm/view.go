@@ -8,7 +8,16 @@ type View struct {
 	Zoom   float64
 	// W and H are the canvas size in dots.
 	W, H int
+	// Detail draws as much as a view this many zooms closer would: its
+	// tiles, streets, buildings and names, over this view's area. It lets a
+	// small panel show what a larger map of the same area shows.
+	Detail float64
 }
+
+// DetailZoom is the zoom that decides what is drawn. It is rounded to a
+// millionth, as zoom minus a fitted zoom plus that zoom need not give the
+// original back exactly, and a hair under 16 would hide the buildings.
+func (v View) DetailZoom() float64 { return math.Round((v.Zoom+v.Detail)*1e6) / 1e6 }
 
 // Zoom limits. Past the source's maximum, tiles are enlarged.
 const (

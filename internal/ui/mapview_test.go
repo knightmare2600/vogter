@@ -276,8 +276,42 @@ func TestGeomapWidget(t *testing.T) {
 		t.Fatal("the widget fetches its tiles")
 	}
 	g := m.maps.widgets["1/0/0"]
-	if g == nil || g.Center.Lat != 56.95225 || g.Zoom != 11 {
+	if g == nil || g.Center.Lat != 56.95225 || g.Zoom != geomapZoom(11, 72, g.Cols*2) || g.Zoom >= 11 {
 		t.Fatalf("%+v", g)
 	}
 	wants(t, plain(m), "© OpenStreetMap")
+}
+
+func TestGeomapZoomMatchesTheBrowser(t *testing.T) {
+	// Global view's map: 21 of 72 columns, about 525 pixels in a browser,
+	// drawn here 86 dots wide: about 2.6 zooms further out.
+	if z := geomapZoom(11, 21, 86); z < 8.3 || z > 8.5 {
+		t.Errorf("%v", z)
+	}
+	if z := geomapZoom(11, 21, 2000); z != 11 {
+		t.Error("a terminal wider than the browser keeps the zoom")
+	}
+	if z := geomapZoom(1, 72, 10); z != 0 {
+		t.Error("never below zoom 0")
+	}
+}
+
+func TestGeomapWithoutAViewFitsItsHosts(t *testing.T) {
+	m := located(t)
+	m, _ = press(m, "4")
+	mm, _ := m.Update(eventMsg{poller.Boards{List: []model.Board{{ID: "1", Name: "Sites", Pages: []model.BoardPage{{Widgets: []model.Widget{
+		{Type: "geomap", W: 36, H: 8, Fields: []zabbix.WidgetField{{Name: "hostids.0", Value: "1"}, {Name: "hostids.1", Value: "2"}}},
+		{Type: "geomap", X: 36, W: 36, H: 8, Fields: []zabbix.WidgetField{{Name: "default_view", Value: "55.396,10.386"}}},
+	}}}}}}})
+	m, _ = press(mm.(Model), "enter")
+	fitted := m.maps.widgets["1/0/0"]
+	for _, mk := range widgetMarkers(m.maps.markers, []string{"1", "2"}) {
+		if _, _, ok := fitted.Locate(mk.Pos); !ok {
+			t.Errorf("%s not in the fitted widget", mk.Label)
+		}
+	}
+	noZoom := m.maps.widgets["1/0/1"]
+	if want := geomapZoom(7, 36, noZoom.Cols*2); noZoom.Zoom != want {
+		t.Errorf("no zoom given means half the provider's 14, adjusted: %v, want %v", noZoom.Zoom, want)
+	}
 }

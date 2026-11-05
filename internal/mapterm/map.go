@@ -49,6 +49,8 @@ type Map struct {
 	Labels     bool
 	Palette    Palette
 	Style      Style
+	// Detail draws as a view this many zooms closer would; see View.Detail.
+	Detail float64
 	// Hidden layers are not drawn.
 	Hidden map[Layer]bool
 
@@ -64,6 +66,7 @@ type frameKey struct {
 	cols, rows int
 	center     LatLon
 	zoom       float64
+	detail     float64
 	mode       Mode
 	labels     bool
 	hidden     [8]bool
@@ -88,7 +91,7 @@ func (m *Map) SetSize(cols, rows int) { m.Cols, m.Rows = max(cols, 0), max(rows,
 
 // View is the current view in dots.
 func (m *Map) View() View {
-	return View{Center: m.Center, Zoom: m.Zoom, W: m.Cols * CellW, H: m.Rows * CellH}
+	return View{Center: m.Center, Zoom: m.Zoom, W: m.Cols * CellW, H: m.Rows * CellH, Detail: m.Detail}
 }
 
 // Pan moves by a fraction of the screen: 1 is a whole width or height.
@@ -178,7 +181,7 @@ func (m *Map) ToggleLayer(l Layer) { m.Hidden[l] = !m.Hidden[l] }
 func (m *Map) NextMode() { m.Mode = Modes[(int(m.Mode)+1)%len(Modes)] }
 
 func (m *Map) key(tiles, maxZoom int) frameKey {
-	k := frameKey{m.Cols, m.Rows, m.Center, m.Zoom, m.Mode, m.Labels, [8]bool{}, tiles, maxZoom}
+	k := frameKey{m.Cols, m.Rows, m.Center, m.Zoom, m.Detail, m.Mode, m.Labels, [8]bool{}, tiles, maxZoom}
 	for l, h := range m.Hidden {
 		if int(l) < len(k.hidden) {
 			k.hidden[l] = h

@@ -324,3 +324,48 @@ func TestLocate(t *testing.T) {
 		t.Error("invalid")
 	}
 }
+
+func TestDetailDrawsWhatACloserViewWould(t *testing.T) {
+	// A tile covered in small buildings, so some fall in any view of it.
+	var blocks [][]mvt.Pt
+	for x := int32(0); x < 4096; x += 64 {
+		for y := int32(0); y < 4096; y += 64 {
+			blocks = append(blocks, []mvt.Pt{pt(x, y), pt(x+40, y), pt(x+40, y+40), pt(x, y+40), pt(x, y)})
+		}
+	}
+	tile := &mvt.Tile{Layers: map[string]*mvt.Layer{"building": {Name: "building", Extent: 4096,
+		Features: []mvt.Feature{{Type: mvt.Polygon, Geometry: blocks}}}}}
+	asked := map[int]bool{}
+	lookup := func(id TileID) (*mvt.Tile, bool) { asked[id.Z] = true; return tile, true }
+	has := func(f *Frame) bool {
+		for _, c := range f.Cells {
+			if c.Class == ClassBuilding && c.R != ' ' {
+				return true
+			}
+		}
+		return false
+	}
+	m := New(odense, 15.4)
+	m.SetSize(43, 12)
+	if f, _ := m.Render(14, 1, lookup); has(f) {
+		t.Fatal("buildings are hidden at zoom 15.4")
+	}
+	m.Detail = 0.6
+	f, _ := m.Render(14, 1, lookup)
+	if !has(f) {
+		t.Error("with detail, buildings show as at zoom 16")
+	}
+	if m.View().Zoom != 15.4 {
+		t.Error("detail must not change the area shown")
+	}
+	// Too far out to read, buildings stay hidden whatever the detail.
+	far := New(odense, 13.4)
+	far.SetSize(43, 12)
+	far.Detail = 2.6
+	if f, _ := far.Render(14, 1, lookup); has(f) {
+		t.Error("buildings at zoom 13.4 would fill the panel")
+	}
+	if !asked[14] {
+		t.Error("with detail, the deeper tiles are read")
+	}
+}

@@ -345,22 +345,57 @@ func TestDrawPlacesFeatures(t *testing.T) {
 	if len(missing) != 0 {
 		t.Fatalf("%v", missing)
 	}
-	water := 0
-	for row := 20; row < 44; row++ {
-		for col := 40; col < 88; col++ {
-			if d, cl := c.Cell(col, row); d != 0 && cl == ClassWater {
-				water++
+	// At zoom 0 the land around the water square is textured, the water
+	// inside it is clear, and its shore is drawn as a line.
+	inner, land, shore := 0, 0, 0
+	for row := range 64 {
+		for col := range 128 {
+			d, cl := c.Cell(col, row)
+			switch {
+			case col > 68 && col < 92 && row > 20 && row < 44 && d != 0:
+				inner++
+			case cl == ClassLand && d != 0:
+				land++
+			case cl == ClassWater:
+				shore++
 			}
 		}
 	}
-	if water < 200 {
-		t.Errorf("the middle must be textured as water: %d cells", water)
+	if inner != 0 {
+		t.Errorf("open water must stay clear: %d cells", inner)
 	}
-	if _, cl := c.Cell(10, 6); cl != ClassMotorway {
-		t.Errorf("road row %v", cl)
+	if land < 500 {
+		t.Errorf("land is textured at world zooms: %d cells", land)
 	}
-	if d, _ := c.Cell(10, 50); d != 0 {
-		t.Error("outside the features must be blank")
+	if shore < 80 {
+		t.Errorf("the shore is drawn: %d cells", shore)
+	}
+}
+
+func TestShoreSkipsTileEdges(t *testing.T) {
+	// Water filling a whole tile: its outline is only the tile's own edges,
+	// which are cuts, not shore, so nothing is drawn.
+	tile := &mvt.Tile{Layers: map[string]*mvt.Layer{"water": {Name: "water", Extent: 4096, Features: []mvt.Feature{{Type: mvt.Polygon,
+		Geometry: [][]mvt.Pt{{pt(-64, -64), pt(4160, -64), pt(4160, 4160), pt(-64, 4160), pt(-64, -64)}}}}}}}
+	v := View{Center: LatLon{0, 0}, Zoom: 12, W: 256, H: 256}
+	c := NewCanvas(128, 64)
+	Draw(c, v, 14, func(TileID) (*mvt.Tile, bool) { return tile, true }, DefaultStyle)
+	for row := range 64 {
+		for col := range 128 {
+			if d, _ := c.Cell(col, row); d != 0 {
+				t.Fatalf("open sea must be blank, found dots at %d,%d", col, row)
+			}
+		}
+	}
+}
+
+func TestEmptyTileIsNotLand(t *testing.T) {
+	c := NewCanvas(64, 32)
+	Draw(c, View{Center: LatLon{0, 0}, Zoom: 0, W: 128, H: 128}, 14, func(TileID) (*mvt.Tile, bool) { return &mvt.Tile{Layers: map[string]*mvt.Layer{}}, true }, DefaultStyle)
+	for i := range c.dots {
+		if c.dots[i] != 0 {
+			t.Fatal("a tile with no data says nothing about land")
+		}
 	}
 }
 
