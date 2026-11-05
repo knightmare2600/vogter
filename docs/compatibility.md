@@ -89,6 +89,21 @@ it. Scripts and services still get the "no profiles configured" error, as they a
 a token calls `token.delete`. These are the only calls Vægter makes that change anything on the server besides
 `event.acknowledge`. Tokens are created without an expiry; revoke one under User settings → API tokens.
 
+## Map
+
+New in Vægter; zabterm has none. `internal/mapterm` draws OpenMapTiles vector tiles from OpenFreeMap: its own
+decoder, no new modules. It follows OpenFreeMap's terms: a User-Agent naming Vægter, at most four requests at once,
+only the tiles on screen, and the credit "© OpenMapTiles © OpenStreetMap" always shown. The map is off by default and
+builds no network client until turned on. Tiles are cached in memory and on disk (200 MB, least recently used first,
+grouped by OpenFreeMap's data build), and the last tile list is kept, so a seen area draws with no network.
+
+Hosts come from `host.get` with `selectInventory` (`location_lat`, `location_lon`, `location`, `site_city`,
+`site_country`), read once a minute while the map is shown. Zabbix 7.0.32 returns `[]` instead of an object for a host
+whose inventory is disabled; Vægter reads that as no location. Coordinates may use a decimal comma or a compass letter.
+`[profiles.NAME.locations]` places hosts by ID or name and wins over the inventory.
+
+The Boards `geomap` widget draws the same map at the widget's saved view when the map is on.
+
 ## Scrollbars and mouse
 
 Vægter adds a scrollbar to any table that overflows; a table that fits looks as it does in zabterm. The mouse wheel is
@@ -119,6 +134,8 @@ Template dashboards are not read.
 
 Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`:
 
+- The map with host markers on the lab: inventory positions, a decimal comma, a config position, two hosts in one
+  spot, a city with no coordinates, and opening a host from its marker.
 - `vaegter check` with `token_cmd` and username/password; a bad token, bad password and wrong URL each gave the right hint.
 - `go test -tags live ./internal/integration` passed.
 - Dashboard, hosts, problems, latest data, acknowledge, and graphs at 1h, 24h and 7d (trends).
@@ -134,6 +151,8 @@ Tested on Zabbix 7.0.32 with PostgreSQL and agent 2, using `tools/zabbix-lab.sh`
 ## Not verified
 
 - Zabbix 6.4 and 8.0 have not run against a real server, including `4 Boards`.
+- The map's colours have been checked by calculation, not by eye in every terminal. Braille needs a font with braille
+  glyphs, which some Windows terminal fonts lack; `v` switches to Unicode or ASCII.
 - Linux arm64, armv7, armel, ppc64, mipsel and mips64el pass the full test suite and run against the mock server under
   QEMU, not on real hardware. macOS arm64 passes the tests on GitHub's runner. The macOS and Windows binaries have not
   been launched, and Windows arm64 has not run at all, including its tests.

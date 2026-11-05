@@ -434,3 +434,28 @@ func TestSaveProfileRefusesABrokenFile(t *testing.T) {
 		t.Error("a config that does not parse must be left alone")
 	}
 }
+
+func TestProfileLocations(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.toml")
+	body := "[profiles.a]\nurl = \"https://z.example\"\ntoken = \"t\"\n[profiles.a.locations]\n\"web-01\" = [55.39594, 10.38621]\n\"10084\" = [56, 10]\n\"bad\" = [1]\n\"far\" = [95.0, 0.0]\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	c, issues, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := c.Profiles["a"].HostLocations()
+	if got["web-01"] != [2]float64{55.39594, 10.38621} || got["10084"] != [2]float64{56, 10} || len(got) != 2 {
+		t.Errorf("whole numbers must read as degrees too: %v", got)
+	}
+	n := 0
+	for _, i := range issues {
+		if strings.Contains(i.Msg, "location") {
+			n++
+		}
+	}
+	if n != 2 {
+		t.Errorf("both bad entries reported: %v", issues)
+	}
+}

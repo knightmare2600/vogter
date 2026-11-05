@@ -9,6 +9,10 @@ Vægter is not affiliated with, or endorsed by, the zabterm author. zabterm's
 MIT licence notice is reproduced in LICENSE. Theme palette values, role
 formulas, request parameters, item keys and screen layouts follow zabterm.
 
+The map screen draws data © OpenStreetMap contributors, under the Open Database License
+(https://www.openstreetmap.org/copyright), from OpenMapTiles vector tiles served by OpenFreeMap. Vægter ships no map
+data. See docs/map.md.
+
 Third-party Go modules are listed in docs/dependencies.md. The licence text of
 every module linked into the binary is in THIRD_PARTY_NOTICES.txt, which
 `make notices` generates and release archives include.

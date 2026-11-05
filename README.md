@@ -80,6 +80,46 @@ Coming from zabterm? `bin/vaegter import` copies your config across.
 
 `bin/vaegter licences` prints Vægter's licence and those of the code it includes, so the binary can be shared alone.
 
+Press `5` for the map: OpenStreetMap drawn in the terminal, in braille, Unicode or ASCII. It is off until you
+turn it on, because drawing it sends the area you view, and your IP address, to OpenFreeMap and its CDN. Press `e` on
+the map screen to try it for one session, or set `enabled = true` under `[map]`. Tiles you have seen are cached, up to
+200 MB, so the map also works offline for those areas.
+
+| Keys | On the map |
+|---|---|
+| `h j k l`, arrows | Pan |
+| `+` `-` | Zoom; the mouse wheel zooms too when the mouse is on |
+| `:` | Go to a latitude and longitude, such as `55.396, 10.386, 14` |
+| `b` | Back to the previous place |
+| `f` | Fit every host, or return to the start |
+| `v` `P` | Drawing mode, colour palette |
+| `y` `L` | Layers, labels |
+| `n` `p` `c` | Next or previous host, centre on it |
+| `Enter` | Open the selected host |
+| `x` `/` | Only hosts with problems, filter by name or group |
+| `o` | Open the same place on openstreetmap.org |
+
+Hosts appear where their Zabbix inventory puts them (`location_lat` and `location_lon`, with a decimal point or a
+decimal comma), and the map fits itself to them the first time. Markers show health by shape and colour: `●` fine,
+`▲` warning or average, `■` high or disaster (pulsing for disaster), `○` unreachable, disabled or in maintenance.
+Hosts in one spot merge into a count. A host with no coordinates can be placed in the config instead:
+
+```toml
+[profiles.prod.locations]
+"web-01" = [55.39594, 10.38621]   # by name or host ID
+```
+
+Host locations are read once a minute, and only while the map is on screen. Vægter does not geocode: a host with only
+a city in its inventory is counted on the status line but not placed.
+
+Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, under the ODbL. Tiles ©
+OpenMapTiles, served by [OpenFreeMap](https://openfreemap.org). The palettes include solarized dark and light, and
+every palette is held to WCAG contrast: 4.5:1 for names, 3:1 for roads and water.
+
+The full map guide, with examples, is in `docs/map.md`.
+
+Press `A` for the About box.
+
 Press `4` for Boards: your Zabbix global dashboards, read-only. Widgets a terminal cannot draw, such as maps, show a
 placeholder, and `o` opens the page in Zabbix. See `docs/compatibility.md`.
 

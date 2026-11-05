@@ -31,6 +31,7 @@ const (
 	Hosts
 	Problems
 	Boards
+	Map
 	Host
 )
 
@@ -54,7 +55,7 @@ const (
 	ackTimeout = 25 * time.Second
 )
 
-var viewNames = [...]string{"Dashboard", "Hosts", "Problems", "Boards"}
+var viewNames = [...]string{"Dashboard", "Hosts", "Problems", "Boards", "Map"}
 
 var spinner = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
 
@@ -112,6 +113,8 @@ type Options struct {
 	// WatchBoard makes the poller follow the dashboard list and, with an id,
 	// one dashboard page. It must not block.
 	WatchBoard func(on bool, id string, page int)
+	// WatchMap turns reading host locations on or off. It must not block.
+	WatchMap func(on bool)
 	// WebURL is the frontend base URL.
 	WebURL string
 	// Desktop turns on desktop notifications; MinSeverity filters them
@@ -122,6 +125,10 @@ type Options struct {
 	ASCII bool
 	// Mouse starts with the wheel scrolling; M toggles it.
 	Mouse bool
+	// Map configures the map screen.
+	Map MapOptions
+	// Version is shown in the About box.
+	Version string
 	// Notify and Open reach the desktop.
 	Notify func(title, body string, urgent bool) error
 	Open   func(url string) error
@@ -156,6 +163,7 @@ type Model struct {
 	snapshot *model.Snapshot
 
 	hostFilter, problemFilter string
+	mapFilter                 string
 	editing                   bool
 	hostSort                  model.HostSort
 	minSeverity               model.Severity
@@ -181,12 +189,17 @@ type Model struct {
 	boardX       int
 	boardData    *model.BoardData
 
+	maps  *mapState
+	about bool
+	// egg is the frame the hidden message started on, or -1 when it is off.
+	egg int
+
 	quitting bool
 }
 
 // New builds the model.
 func New(o Options) Model {
-	return Model{
+	m := Model{
 		opts:      o,
 		mouse:     o.Mouse,
 		theme:     theme.Load(o.Theme),
@@ -198,7 +211,13 @@ func New(o Options) Model {
 		hostSort:  model.SortProblems,
 		rangeIdx:  1,
 		backTo:    Hosts,
+		maps:      newMapState(o.Map),
+		egg:       -1,
 	}
+	if o.Map.Enabled {
+		m.turnMapOn()
+	}
+	return m
 }
 
 func tick() tea.Cmd {
@@ -220,9 +239,26 @@ func (m Model) Init() tea.Cmd {
 	return tea.Batch(tick(), m.waitEvent())
 }
 
-// Update handles one message.
+// Update handles one message, then lets the map fetch whatever its new view
+// lacks.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	mm, cmd := m.update(msg)
+	next := mm.(Model)
+	// Markers follow every change to hosts, filters and selection.
+	if next.view == Map || next.view == Boards {
+		next.rebuildMarkers()
+	}
+	if sync := next.mapSync(); sync != nil {
+		return next, tea.Batch(cmd, sync)
+	}
+	return next, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case mapTileMsg:
+		m.onMapTile(msg)
+		return m, nil
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 	case tickMsg:
@@ -298,6 +334,7 @@ func (m *Model) onEvent(ev poller.Event) {
 		m.announce(&snap)
 		m.snapshot = &snap
 		m.clampSelection()
+		m.rebuildMarkers()
 	case poller.Detail:
 		// A late answer for another host or range is dropped.
 		if ev.HostID == m.detailHost && ev.Range == ranges[m.rangeIdx].secs {
@@ -305,6 +342,8 @@ func (m *Model) onEvent(ev poller.Event) {
 			m.detail = &d
 			m.clampSelection()
 		}
+	case poller.MapLocations:
+		m.onLocations(ev.Locations)
 	case poller.Boards:
 		m.boards, m.boardsLoaded = ev.List, true
 		m.boardSel = min(m.boardSel, max(len(m.boards)-1, 0))
@@ -360,6 +399,8 @@ func (m Model) webURL() string {
 			return base + "dashboard.view&dashboardid=" + m.boardID
 		}
 		return base + "dashboard.list"
+	case Map:
+		return m.mapURL()
 	case Hosts:
 		if hs := m.filteredHosts(); m.hostSel < len(hs) {
 			return base + "latest.view&" + hostParam + hs[m.hostSel].ID
@@ -448,6 +489,11 @@ func (m *Model) moveSelection(delta int) {
 		m.hostSel = max(min(m.hostSel+delta, len(m.filteredHosts())-1), 0)
 	case Problems:
 		m.problemSel = max(min(m.problemSel+delta, len(m.filteredProblems())-1), 0)
+	case Map:
+		// Up and down pan; a jump to the top or bottom means nothing here.
+		if m.maps.on && abs(delta) < 1000 {
+			m.maps.main.Pan(0, float64(delta)*mapPanStep)
+		}
 	case Boards:
 		if m.boardID == "" {
 			m.boardSel = max(min(m.boardSel+delta, len(m.boards)-1), 0)
@@ -476,6 +522,16 @@ func (m Model) boardGeom() (boardGeom, bool) {
 // page moves by a screenful, or half of one, on an open board, and by the
 // list step everywhere else.
 func (m *Model) page(dir int, half bool) {
+	if m.view == Map {
+		if m.maps.on {
+			step := 1.0
+			if half {
+				step = 0.5
+			}
+			m.maps.main.Pan(0, float64(dir)*step)
+		}
+		return
+	}
 	g, ok := m.boardGeom()
 	if m.view != Boards || m.boardID == "" || !ok {
 		m.moveSelection(dir * pageStep)
@@ -491,6 +547,14 @@ func (m *Model) page(dir int, half bool) {
 func (m *Model) panBoard(delta int) {
 	if g, ok := m.boardGeom(); ok {
 		m.boardX = max(min(min(m.boardX, g.maxX())+delta, g.maxX()), 0)
+	}
+}
+
+// watchMap reads host locations while the map, or a board that may hold a
+// geomap widget, is open and the map is on.
+func (m *Model) watchMap() {
+	if m.opts.WatchMap != nil {
+		m.opts.WatchMap(m.maps.on && (m.view == Map || m.view == Boards))
 	}
 }
 
@@ -520,7 +584,11 @@ func (m *Model) openHost(id string) {
 	}
 	m.detailHost = id
 	m.backTo = m.view
+	leavingMap := m.view == Map
 	m.view = Host
+	if leavingMap {
+		m.watchMap()
+	}
 	m.hostTab = tabGraphs
 	m.watch(id)
 }
@@ -531,9 +599,13 @@ func (m *Model) show(v View) {
 		m.watch("")
 	}
 	changed := (m.view == Boards) != (v == Boards)
+	mapChanged := (m.view == Map) != (v == Map)
 	m.view = v
 	if changed {
 		m.watchBoard()
+	}
+	if mapChanged {
+		m.watchMap()
 	}
 }
 
@@ -558,10 +630,23 @@ func (m *Model) shiftBoardPage(delta int) {
 // onWheel scrolls like j and k. A dialog or filter being typed keeps the
 // wheel from moving the list behind it.
 func (m *Model) onWheel(msg tea.MouseWheelMsg) {
-	if !m.mouse || m.help || m.ack != nil || m.editing {
+	if !m.mouse || m.help || m.ack != nil || m.editing || m.about {
 		return
 	}
 	sideways := msg.Mod.Contains(tea.ModShift)
+	if m.view == Map && m.maps.on {
+		switch {
+		case sideways && msg.Button == tea.MouseWheelUp, msg.Button == tea.MouseWheelLeft:
+			m.maps.main.Pan(-mapPanStep, 0)
+		case sideways && msg.Button == tea.MouseWheelDown, msg.Button == tea.MouseWheelRight:
+			m.maps.main.Pan(mapPanStep, 0)
+		case msg.Button == tea.MouseWheelUp:
+			m.maps.main.ZoomBy(0.5)
+		case msg.Button == tea.MouseWheelDown:
+			m.maps.main.ZoomBy(-0.5)
+		}
+		return
+	}
 	switch msg.Button {
 	case tea.MouseWheelUp:
 		if sideways {
@@ -602,6 +687,10 @@ func (m *Model) filter() *string {
 		if m.hostTab == tabItems {
 			return &m.itemFilter
 		}
+	case Map:
+		if m.maps.on {
+			return &m.mapFilter
+		}
 	}
 	return nil
 }
@@ -639,6 +728,18 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.help = false
 		}
 		return m, nil
+	case m.about:
+		switch {
+		case isEggKey(k):
+			m.toggleEgg()
+		case key == "esc" || key == "q" || key == "enter" || key == "A":
+			m.about = false
+		}
+		return m, nil
+	case m.maps.prompting:
+		return m.onMapPromptKey(k)
+	case m.maps.layers:
+		return m.onMapLayerKey(key)
 	case m.ack != nil:
 		return m.onAckKey(k)
 	case m.editing:
@@ -646,6 +747,10 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if isEggKey(k) {
+		m.toggleEgg()
+		return m, nil
+	}
 	switch key {
 	case "q":
 		m.quitting = true
@@ -660,6 +765,10 @@ func (m Model) onKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.show(Problems)
 	case "4":
 		m.show(Boards)
+	case "5":
+		m.show(Map)
+	case "A":
+		m.about = true
 	case "tab":
 		if m.view == Host {
 			return m.onViewKey(key)
@@ -752,6 +861,8 @@ func (m Model) onViewKey(key string) (tea.Model, tea.Cmd) {
 			m.hideAcked = !m.hideAcked
 			m.problemSel = 0
 		}
+	case Map:
+		return m.onMapKey(key)
 	case Boards:
 		switch key {
 		case "enter", "l":
@@ -868,6 +979,8 @@ func (m Model) render() string {
 		body = m.hostsView(m.width, bodyH)
 	case m.view == Boards:
 		body = m.boardsView(m.width, bodyH)
+	case m.view == Map:
+		body = m.mapView(m.width, bodyH)
 	case m.view == Host:
 		body = m.hostView(m.width, bodyH)
 	default:
@@ -924,6 +1037,8 @@ func (m Model) modal() string {
 		return m.helpBox()
 	case m.ack != nil:
 		return m.ackBox()
+	case m.about:
+		return m.aboutBox()
 	}
 	return ""
 }
@@ -1026,6 +1141,12 @@ func (m Model) hints() [][2]string {
 		}
 		return [][2]string{{"esc", "back"}, {"j/k", "scroll"}, {"h/l", "pan"}, {"pgup/pgdn", "page"}, {"[ ]", "tab"}, {"o", "web"}, {"?", "help"}}
 	}
+	if m.view == Map {
+		if !m.maps.on {
+			return [][2]string{{"e", "turn the map on"}, {"?", "help"}}
+		}
+		return [][2]string{{"hjkl", "pan"}, {"+/-", "zoom"}, {"n/p", "host"}, {"⏎", "open"}, {"f", "fit"}, {"x", "problems"}, {"/", "filter"}, {":", "go to"}, {"v P y L", "look"}}
+	}
 	if m.view == Host {
 		if m.hostTab == tabItems {
 			return [][2]string{{"esc", "back"}, {"tab", "graphs"}, {"/", "filter"}, {"j/k", "move"}, {"o", "web"}, {"?", "help"}}
@@ -1041,6 +1162,9 @@ func (m Model) footer() string {
 		f := m.filter()
 		return lipgloss.NewStyle().Foreground(t.BG).Background(t.Accent).Bold(true).Render(" / ") + " " +
 			fg(t.FG).Render(*f) + fg(t.Accent).Render("▏") + fg(t.Muted).Render("   ⏎ keep  esc clear")
+	}
+	if m.egg >= 0 {
+		return m.eggLine(m.width)
 	}
 	var b strings.Builder
 	b.WriteString(" ")
@@ -1118,10 +1242,11 @@ func (m Model) helpBox() string {
 		name string
 		keys [][2]string
 	}{
-		{"Global", [][2]string{{"1 2 3 4 / tab", "switch view"}, {"r", "refresh now"}, {"t", "cycle theme"}, {"M", "mouse wheel on / off"}, {"o", "open in Zabbix web"}, {"?", "this help"}, {"q", "quit"}}},
+		{"Global", [][2]string{{"1 2 3 4 5 / tab", "switch view"}, {"r", "refresh now"}, {"t", "cycle theme"}, {"M", "mouse wheel on / off"}, {"A", "about"}, {"o", "open in Zabbix web"}, {"?", "this help"}, {"q", "quit"}}},
 		{"Lists", [][2]string{{"j k ↑ ↓", "move"}, {"g G", "top / bottom"}, {"ctrl-d ctrl-u", "page"}, {"/", "filter"}, {"⏎", "drill into host"}}},
 		{"Problems", [][2]string{{"a", "acknowledge (+ message, close)"}, {"+ -", "minimum severity"}, {"h", "hide acknowledged"}}},
 		{"Host", [][2]string{{"[ ]", "time range 15m → 7d"}, {"tab", "graphs / latest data"}, {"esc", "back"}}},
+		{"Map", [][2]string{{"h j k l ←→↑↓", "pan"}, {"+ -", "zoom"}, {"f", "fit hosts"}, {"b", "back"}, {":", "go to lat, lon"}, {"n p c", "next, previous, centre host"}, {"⏎", "open the host"}, {"x /", "problems only, filter hosts"}, {"v P", "mode, palette"}, {"y L", "layers, labels"}}},
 		{"Boards", [][2]string{{"⏎", "open a Zabbix dashboard"}, {"j k h l", "scroll and pan"}, {"pgup pgdn", "screen"}, {"ctrl-d ctrl-u", "half screen"}, {"g G", "top / bottom"}, {"[ ]", "dashboard page"}, {"esc", "back"}}},
 	}
 	lines := []string{""}

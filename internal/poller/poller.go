@@ -42,6 +42,7 @@ type API interface {
 	ItemsMatching(ctx context.Context, hostIDs, patterns []string) ([]zabbix.Item, error)
 	ItemsNamed(ctx context.Context, hostIDs, names []string) ([]zabbix.Item, error)
 	Dashboards(ctx context.Context) ([]zabbix.Dashboard, error)
+	HostInventories(ctx context.Context) ([]zabbix.HostInventory, error)
 	Count(ctx context.Context, method string) (string, error)
 	Acknowledge(ctx context.Context, eventIDs []string, message string, close bool) error
 }
@@ -104,11 +105,16 @@ type Poller struct {
 	detailPoke chan struct{}
 	boarding   boardWatch
 	boardPoke  chan struct{}
+	mapping    bool
+	mapPoke    chan struct{}
+
+	// Locations from the config place hosts Zabbix has no coordinates for.
+	Locations map[string][2]float64
 }
 
 // New builds a poller.
 func New(api API, auth config.Auth, interval time.Duration, f Fmt) *Poller {
-	return &Poller{API: api, Auth: auth, Interval: interval, Fmt: f, Now: time.Now, detailPoke: make(chan struct{}, 1), boardPoke: make(chan struct{}, 1)}
+	return &Poller{API: api, Auth: auth, Interval: interval, Fmt: f, Now: time.Now, detailPoke: make(chan struct{}, 1), boardPoke: make(chan struct{}, 1), mapPoke: make(chan struct{}, 1)}
 }
 
 // Acknowledge runs outside the poll loop, so it does not wait behind a slow
@@ -123,9 +129,10 @@ func (p *Poller) Acknowledge(ctx context.Context, eventIDs []string, message str
 // one follow-up poll. On exit it closes any user.login session.
 func (p *Poller) Run(ctx context.Context, cmds <-chan Cmd, events chan<- Event) {
 	var wg sync.WaitGroup
-	wg.Add(2)
+	wg.Add(3)
 	go func() { defer wg.Done(); p.detailLoop(ctx, events) }()
 	go func() { defer wg.Done(); p.boardLoop(ctx, events) }()
+	go func() { defer wg.Done(); p.mapLoop(ctx, events) }()
 	defer wg.Wait()
 	defer func() {
 		lctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -139,6 +146,7 @@ func (p *Poller) Run(ctx context.Context, cmds <-chan Cmd, events chan<- Event) 
 		p.poll(ctx, events)
 		p.pokeDetail()
 		p.pokeBoard()
+		p.pokeMap()
 		// Drain anything that queued up during the poll: one follow-up
 		// poll covers all of it.
 		pending := false

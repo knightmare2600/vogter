@@ -7,6 +7,8 @@ internal/zabbix     JSON-RPC client (no UI imports), typed methods, error kinds,
 internal/model      pure: joins API responses into hosts and problems, filters, sorts, tiles, sparkline buffers
 internal/poller     goroutine owning the client: connect, poll, net/disk budget, seed, coalesce, re-login, logout
 internal/onboard    welcome flow: test a server, turn a login into an API token, save the profile
+internal/mapterm    terminal map: vector tile decoder (mvt/), projection, braille canvas, styles, labels, tile
+                    loading, memory and disk caches, markers; no Zabbix or UI imports
 internal/notify     pure diff of two snapshots into announcements
 internal/platform   desktop notifications and browser opening
 internal/theme      built-in palettes and Omarchy themes reduced to UI colour roles

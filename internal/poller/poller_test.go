@@ -38,6 +38,8 @@ type fakeAPI struct {
 	boards       []zabbix.Dashboard
 	boardErr     error
 	boardItems   []zabbix.Item
+	inventory    []zabbix.HostInventory
+	inventoryErr error
 }
 
 func (f *fakeAPI) log(s string) { f.mu.Lock(); f.calls = append(f.calls, s); f.mu.Unlock() }
@@ -88,6 +90,13 @@ func (f *fakeAPI) ItemsNamed(context.Context, []string, []string) ([]zabbix.Item
 func (f *fakeAPI) Dashboards(context.Context) ([]zabbix.Dashboard, error) {
 	f.log("dashboards")
 	return f.boards, f.boardErr
+}
+
+func (f *fakeAPI) HostInventories(context.Context) ([]zabbix.HostInventory, error) {
+	f.log("inventories")
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.inventory, f.inventoryErr
 }
 
 func (f *fakeAPI) Count(_ context.Context, method string) (string, error) {

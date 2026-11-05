@@ -105,7 +105,7 @@ func TestBoardListAndNavigation(t *testing.T) {
 	if last := (*calls)[len(*calls)-1]; !last.on {
 		t.Errorf("tab must start the watch: %+v", last)
 	}
-	if m, _ = press(m, "tab"); m.view != Dashboard {
+	if m, _ = press(m, "tab", "tab"); m.view != Dashboard {
 		t.Errorf("tab wraps: %v", m.view)
 	}
 }
@@ -130,7 +130,7 @@ func TestBoardRendersEveryWidget(t *testing.T) {
 	wants(t, out,
 		"Current problems", "Zabbix agent is not available", "Local time",
 		"Problems by severity", "High 1", "Average 0", // filtered to host 2
-		"geomap widget", "newwidget widget", "not drawn in a terminal",
+		"map is off", "newwidget widget", "not drawn in a terminal",
 		"3 available", "1 not available",
 		"5.50 vps", "web-01 · rate",
 		"Top hosts", "NVPS", "+2 more series",

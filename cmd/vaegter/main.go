@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ import (
 
 	"github.com/knightmare2600/vogter"
 	"github.com/knightmare2600/vogter/internal/config"
+	"github.com/knightmare2600/vogter/internal/mapterm"
 	"github.com/knightmare2600/vogter/internal/model"
 	"github.com/knightmare2600/vogter/internal/onboard"
 	"github.com/knightmare2600/vogter/internal/platform"
@@ -295,6 +297,47 @@ func failAPI(w io.Writer, err error) int {
 	return 1
 }
 
+// mapOptions turns the [map] settings into the map screen's options. Nothing
+// is fetched here: the source is built when the map is first shown.
+func mapOptions(c config.Map) ui.MapOptions {
+	o := ui.MapOptions{Enabled: c.Enabled, Labels: config.On(c.ShowLabels), Hidden: map[mapterm.Layer]bool{
+		mapterm.LayerBuildings: !config.On(c.ShowBuildings),
+		mapterm.LayerRailways:  !config.On(c.ShowRailways),
+		mapterm.LayerParks:     !config.On(c.ShowParks),
+	}}
+	o.Mode, _ = mapterm.ParseMode(c.RenderMode)
+	o.Palette, _ = mapterm.PaletteByName(c.Palette, false)
+	if c.Latitude != nil && c.Longitude != nil {
+		at := mapterm.LatLon{Lat: *c.Latitude, Lon: *c.Longitude}
+		if at.Valid() && at.Lat >= -mapterm.MaxLat && at.Lat <= mapterm.MaxLat {
+			o.Center, o.Zoom = &at, 12
+			if c.Zoom != nil && *c.Zoom >= 0 && *c.Zoom <= mapterm.MaxZoom {
+				o.Zoom = *c.Zoom
+			}
+		}
+	}
+	tileJSON := mapterm.OpenFreeMap
+	if strings.HasPrefix(c.TileSource, "https://") || strings.HasPrefix(c.TileSource, "http://") {
+		tileJSON = c.TileSource
+	}
+	o.NewSource = func() mapterm.Source {
+		src := mapterm.NewHTTPSource(tileJSON, ui.MapUserAgent(appVersion()))
+		if !config.On(c.CacheEnabled) {
+			return src
+		}
+		dir := c.CacheDir
+		if dir == "" {
+			base, err := os.UserCacheDir()
+			if err != nil {
+				return src
+			}
+			dir = filepath.Join(base, "vogter", "tiles")
+		}
+		return mapterm.NewDiskCache(dir, mapterm.DefaultDiskBudget, src)
+	}
+	return o
+}
+
 // asciiMode reports whether VOGTER_ASCII asks for ASCII glyphs only.
 func asciiMode() bool { return os.Getenv(config.EnvASCII) == "1" }
 
@@ -367,6 +410,7 @@ func tui(o options, path string, stderr io.Writer) int {
 	events := make(chan poller.Event)
 	cmds := make(chan poller.Cmd, 1)
 	pl := poller.New(newClient(p), auth, interval, ui.PollerFmt)
+	pl.Locations = p.HostLocations()
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -388,11 +432,14 @@ func tui(o options, path string, stderr io.Writer) int {
 		Ack:         pl.Acknowledge,
 		Watch:       pl.Watch,
 		WatchBoard:  pl.WatchBoard,
+		WatchMap:    pl.WatchMap,
 		WebURL:      p.WebURL(),
 		Desktop:     c.Notifications.Desktop,
 		MinSeverity: minSev,
 		Notify:      platform.Notify,
 		Open:        platform.OpenURL,
+		Map:         mapOptions(c.Map),
+		Version:     appVersion(),
 	})
 	_, err = tea.NewProgram(m, colourProfile()...).Run()
 	cancel()

@@ -97,7 +97,7 @@ func (m Model) boardsView(w, h int) []string {
 		if m.boardData != nil && m.boardData.BoardID == m.boardID && m.boardData.Page == m.boardPage && c.index < len(m.boardData.Widgets) {
 			d = m.boardData.Widgets[c.index]
 		}
-		body := m.widget(p.Widgets[c.index], d, c.w, c.h)
+		body := m.widget(c.index, p.Widgets[c.index], d, c.w, c.h)
 		if len(body) > 0 {
 			layers = append(layers, lipgloss.NewLayer(strings.Join(body, "\n")).X(c.x).Y(c.y))
 		}
@@ -152,7 +152,7 @@ func (m Model) boardList(w, h int) []string {
 }
 
 // widget draws one widget in exactly w×h cells.
-func (m Model) widget(wg model.Widget, d model.WidgetData, w, h int) []string {
+func (m Model) widget(index int, wg model.Widget, d model.WidgetData, w, h int) []string {
 	t := &m.theme
 	o := panelOpts{title: title(t, truncate(wg.Title(), max(w-6, 1)))}
 	inner := max(w-2, 1)
@@ -192,6 +192,14 @@ func (m Model) widget(wg model.Widget, d model.WidgetData, w, h int) []string {
 		return lines(out)
 	case "tophosts":
 		return lines(m.topLines(d, inner, h-2))
+	case "geomap":
+		if l, ok := m.geomapLines(index, wg, inner, h-2); ok {
+			return lines(l)
+		}
+		return lines([]string{
+			center(fg(t.Muted).Render("map is off"), inner),
+			center(fg(t.Border).Render("press 5 for details, or o to open Zabbix"), inner),
+		})
 	}
 	return lines([]string{
 		center(fg(t.Muted).Render(wg.Type+" widget"), inner),

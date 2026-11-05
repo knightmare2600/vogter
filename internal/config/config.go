@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 
@@ -28,11 +30,39 @@ type Config struct {
 	RefreshInterval int                 `toml:"refresh_interval"`
 	Mouse           bool                `toml:"mouse"`
 	Notifications   Notifications       `toml:"notifications"`
+	Map             Map                 `toml:"map"`
 	Profiles        map[string]*Profile `toml:"profiles"`
 
 	// Path is the file the config was read from; empty when none existed.
 	Path string `toml:"-"`
 }
+
+// Map configures the map screen. It is off until enabled, because drawing it
+// sends the area being viewed to the tile provider.
+type Map struct {
+	Enabled       bool     `toml:"enabled"`
+	TileSource    string   `toml:"tile_source"`
+	RenderMode    string   `toml:"render_mode"`
+	Palette       string   `toml:"palette"`
+	ShowLabels    *bool    `toml:"show_labels"`
+	ShowBuildings *bool    `toml:"show_buildings"`
+	ShowRailways  *bool    `toml:"show_railways"`
+	ShowParks     *bool    `toml:"show_parks"`
+	CacheEnabled  *bool    `toml:"cache_enabled"`
+	CacheDir      string   `toml:"cache_directory"`
+	Latitude      *float64 `toml:"default_latitude"`
+	Longitude     *float64 `toml:"default_longitude"`
+	Zoom          *float64 `toml:"default_zoom"`
+}
+
+// On reports a setting that defaults to true.
+func On(b *bool) bool { return b == nil || *b }
+
+// Map palettes and modes, for validation. The map package owns the real lists.
+var (
+	MapModes    = []string{"braille", "unicode", "ascii"}
+	MapPalettes = []string{"green", "solarized-dark", "solarized-light"}
+)
 
 // Notifications controls toasts and desktop notifications.
 type Notifications struct {
@@ -50,6 +80,9 @@ type Profile struct {
 	Username  string `toml:"username"`
 	Password  Secret `toml:"password"`
 	VerifyTLS *bool  `toml:"verify_tls"`
+	// Locations places hosts on the map that have no coordinates in Zabbix,
+	// keyed by host ID or name: [latitude, longitude].
+	Locations map[string][]float64 `toml:"locations"`
 }
 
 // TLSVerify reports whether certificates are checked; true unless the
@@ -159,11 +192,31 @@ func Load(path string) (*Config, []Issue, error) {
 	return &c, issues, nil
 }
 
+// HostLocations is a profile's valid locations. Bad entries are reported by
+// validate and left out here.
+func (p *Profile) HostLocations() map[string][2]float64 {
+	out := map[string][2]float64{}
+	for k, v := range p.Locations {
+		if len(v) == 2 && v[0] >= -90 && v[0] <= 90 && v[1] >= -180 && v[1] <= 180 {
+			out[k] = [2]float64{v[0], v[1]}
+		}
+	}
+	return out
+}
+
 func (c *Config) validate() []Issue {
 	var out []Issue
+	for _, name := range slices.Sorted(maps.Keys(c.Profiles)) {
+		for k, v := range c.Profiles[name].Locations {
+			if len(v) != 2 || v[0] < -90 || v[0] > 90 || v[1] < -180 || v[1] > 180 {
+				out = append(out, Issue{Msg: fmt.Sprintf("profile %q: location %q must be [latitude, longitude] in range, ignoring it", name, k)})
+			}
+		}
+	}
 	if !validTheme(c.Theme) {
 		out = append(out, Issue{Msg: fmt.Sprintf("unknown theme %q, using tokyo-night (have: auto, %s)", c.Theme, strings.Join(Themes, ", "))})
 	}
+	out = append(out, c.Map.validate()...)
 	if c.RefreshInterval < MinRefresh {
 		out = append(out, Issue{Msg: fmt.Sprintf("refresh_interval %d is below the minimum, using %d", c.RefreshInterval, MinRefresh)})
 	}
@@ -258,4 +311,30 @@ func ParseSeverity(name string) (int, bool) {
 		return 5, true
 	}
 	return 3, false
+}
+
+func (m *Map) validate() []Issue {
+	var out []Issue
+	if m.RenderMode != "" && !slices.Contains(MapModes, strings.ToLower(m.RenderMode)) {
+		out = append(out, Issue{Msg: fmt.Sprintf("unknown map render_mode %q, using braille (have: %s)", m.RenderMode, strings.Join(MapModes, ", "))})
+	}
+	if m.Palette != "" && !slices.Contains(MapPalettes, strings.ToLower(m.Palette)) {
+		out = append(out, Issue{Msg: fmt.Sprintf("unknown map palette %q, using green (have: %s)", m.Palette, strings.Join(MapPalettes, ", "))})
+	}
+	if (m.Latitude == nil) != (m.Longitude == nil) {
+		out = append(out, Issue{Msg: "map default_latitude and default_longitude go together; ignoring the one given"})
+	}
+	if m.Latitude != nil && (*m.Latitude < -85.05 || *m.Latitude > 85.05) {
+		out = append(out, Issue{Msg: fmt.Sprintf("map default_latitude %v is outside -85 to 85, ignoring it", *m.Latitude)})
+	}
+	if m.Longitude != nil && (*m.Longitude < -180 || *m.Longitude > 180) {
+		out = append(out, Issue{Msg: fmt.Sprintf("map default_longitude %v is outside -180 to 180, ignoring it", *m.Longitude)})
+	}
+	if m.Zoom != nil && (*m.Zoom < 0 || *m.Zoom > 19) {
+		out = append(out, Issue{Msg: fmt.Sprintf("map default_zoom %v is outside 0 to 19, ignoring it", *m.Zoom)})
+	}
+	if m.TileSource != "" && !strings.HasPrefix(m.TileSource, "https://") && !strings.HasPrefix(m.TileSource, "http://") {
+		out = append(out, Issue{Msg: fmt.Sprintf("map tile_source %q is not an http or https URL, using OpenFreeMap", m.TileSource)})
+	}
+	return out
 }

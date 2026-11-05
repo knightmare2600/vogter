@@ -1,6 +1,8 @@
 package zabbix
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"strconv"
 )
@@ -118,6 +120,35 @@ type TrendPoint struct {
 	ValueMax string `json:"value_max"`
 }
 
+// Inventory is the location part of a host's inventory. Zabbix returns an
+// empty list, not an object, for a host whose inventory is disabled, which
+// decodes as all empty.
+type Inventory struct {
+	Lat      string `json:"location_lat"`
+	Lon      string `json:"location_lon"`
+	Location string `json:"location"`
+	City     string `json:"site_city"`
+	Country  string `json:"site_country"`
+}
+
+// UnmarshalJSON accepts the object, or the empty list a disabled inventory is.
+func (i *Inventory) UnmarshalJSON(b []byte) error {
+	trimmed := bytes.TrimSpace(b)
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		*i = Inventory{}
+		return nil
+	}
+	type plain Inventory
+	return json.Unmarshal(b, (*plain)(i))
+}
+
+// HostInventory is a host.get row with its inventory location selected.
+type HostInventory struct {
+	HostID    string    `json:"hostid"`
+	Name      string    `json:"name"`
+	Inventory Inventory `json:"inventory"`
+}
+
 // Dashboard is a dashboard.get result row with its pages selected.
 type Dashboard struct {
 	DashboardID string          `json:"dashboardid"`
@@ -157,6 +188,7 @@ type itemList []Item
 type historyList []HistoryPoint
 type trendList []TrendPoint
 type dashboardList []Dashboard
+type inventoryList []HostInventory
 
 func required(what string, i int, fields ...string) error {
 	for _, f := range fields {
@@ -224,6 +256,15 @@ func (l trendList) validate() error {
 func (l dashboardList) validate() error {
 	for i, d := range l {
 		if err := required("dashboard", i, d.DashboardID); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (l inventoryList) validate() error {
+	for i, h := range l {
+		if err := required("host", i, h.HostID); err != nil {
 			return err
 		}
 	}

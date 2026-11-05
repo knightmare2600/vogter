@@ -134,8 +134,8 @@ func TestViewNavigation(t *testing.T) {
 		key  string
 		want View
 	}{
-		{"2", Hosts}, {"3", Problems}, {"1", Dashboard}, {"tab", Hosts}, {"tab", Problems}, {"tab", Boards}, {"tab", Dashboard},
-		{"shift+tab", Boards}, {"shift+tab", Problems}, {"4", Boards},
+		{"2", Hosts}, {"3", Problems}, {"1", Dashboard}, {"tab", Hosts}, {"tab", Problems}, {"tab", Boards}, {"tab", Map}, {"tab", Dashboard},
+		{"shift+tab", Map}, {"shift+tab", Boards}, {"4", Boards}, {"5", Map},
 	}
 	for _, s := range steps {
 		m, _ = press(m, s.key)

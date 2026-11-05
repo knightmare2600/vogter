@@ -27,6 +27,26 @@ desktop = true
 # average, high, disaster.
 min_severity = "average"
 
+[map]
+# The map screen (press 5) draws OpenStreetMap data from OpenFreeMap. It is
+# off until you turn it on, because drawing it sends the area you view, and
+# your IP address, to OpenFreeMap and its CDN. Map data © OpenStreetMap
+# contributors, under the ODbL; tiles © OpenMapTiles.
+enabled = false
+# render_mode = "braille"        # braille, unicode or ascii
+# palette = "green"              # green, solarized-dark, solarized-light
+# show_labels = true
+# show_buildings = true
+# show_railways = true
+# show_parks = true
+# Tiles you have seen are kept so the map works offline (200 MB at most).
+# cache_enabled = true
+# cache_directory = ""           # default: your user cache folder
+# Where the map opens when no host has a location, for example Odense:
+# default_latitude = 55.39593945
+# default_longitude = 10.38620684
+# default_zoom = 12
+
 [profiles.local]
 url = "http://localhost:8080"
 # Create one in Zabbix: User settings -> API tokens.
@@ -39,6 +59,11 @@ token = "paste-your-api-token-here"
 # Or classic username/password (a session is opened with user.login):
 # username = "Admin"
 # password = "zabbix"
+
+# Hosts with no coordinates in their Zabbix inventory can be placed on the
+# map here, by host name or ID, as [latitude, longitude]:
+# [profiles.local.locations]
+# "web-01" = [55.39594, 10.38621]
 
 # Self-signed certificate on the frontend?
 # verify_tls = false

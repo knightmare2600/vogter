@@ -194,6 +194,17 @@ func (c *Client) DeleteToken(ctx context.Context, tokenID string) error {
 	return c.Call(ctx, "token.delete", []string{tokenID}, nil)
 }
 
+// HostInventories returns every host with the location fields of its
+// inventory.
+func (c *Client) HostInventories(ctx context.Context) ([]HostInventory, error) {
+	var out inventoryList
+	err := c.Call(ctx, "host.get", map[string]any{
+		"output":          []string{"hostid", "name"},
+		"selectInventory": []string{"location_lat", "location_lon", "location", "site_city", "site_country"},
+	}, &out)
+	return only(out, err)
+}
+
 // Count runs a counting get on method, such as template.get.
 func (c *Client) Count(ctx context.Context, method string) (string, error) {
 	p := map[string]any{"countOutput": true}
