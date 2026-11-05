@@ -113,7 +113,7 @@ Host locations are read once a minute, and only while the map is on screen. Væg
 a city in its inventory is counted on the status line but not placed.
 
 Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, under the ODbL. Tiles ©
-OpenMapTiles, served by [OpenFreeMap](https://openfreemap.org). The palettes include solarized dark and light, and
+OpenMapTiles, served by [OpenFreeMap](https://openfreemap.org). The palettes are green, amber, blue and cyan phosphor, and solarized dark and light, and
 every palette is held to WCAG contrast: 4.5:1 for names, 3:1 for roads and water.
 
 The full map guide, with examples, is in `docs/map.md`.

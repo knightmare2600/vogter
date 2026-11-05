@@ -58,7 +58,7 @@ func main() {
 	start := time.Now()
 	m.Mode, _ = mapterm.ParseMode(*modeName)
 	m.Labels = *labels
-	if p, ok := mapterm.PaletteByName(*paletteName, true); ok {
+	if p, ok := mapterm.PaletteByName(*paletteName); ok {
 		m.Palette = p
 	}
 	frame, left := m.Render(src.MaxZoom(), loader.Version(), loader.Lookup)

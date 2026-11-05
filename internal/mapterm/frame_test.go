@@ -187,11 +187,13 @@ func TestLinesGroupRuns(t *testing.T) {
 }
 
 func TestPaletteByName(t *testing.T) {
-	if p, ok := PaletteByName("amber", false); ok || p.Name != "green" {
-		t.Error("extras stay locked until allowed")
+	for _, name := range []string{"green", "AMBER", "blue", "cyan", "solarized-dark", "solarized-light"} {
+		if p, ok := PaletteByName(name); !ok || !strings.EqualFold(p.Name, name) {
+			t.Errorf("%s: %v", name, p.Name)
+		}
 	}
-	if p, ok := PaletteByName("AMBER", true); !ok || p.Name != "amber" {
-		t.Error(p.Name)
+	if p, ok := PaletteByName("magenta"); ok || p.Name != "green" {
+		t.Error("an unknown name gives the default")
 	}
 }
 
@@ -199,7 +201,7 @@ func TestPaletteByName(t *testing.T) {
 // roads 3:1. Background textures may be softer.
 func TestPaletteContrast(t *testing.T) {
 	important := []Class{ClassMotorway, ClassMajorRoad, ClassMinorRoad, ClassRail, ClassWaterway, ClassWater}
-	for _, p := range append(append([]Palette{}, Palettes...), ExtraPalettes...) {
+	for _, p := range Palettes {
 		bg := p.Background
 		if bg == nil {
 			bg = color.Black

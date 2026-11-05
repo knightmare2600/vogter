@@ -150,9 +150,13 @@ func TestMapScreen(t *testing.T) {
 	if m.maps.main.Mode != mapterm.ModeUnicode {
 		t.Error("v cycles the mode")
 	}
-	m, _ = press(m, "P")
-	if m.maps.main.Palette.Name != "solarized-dark" {
-		t.Error(m.maps.main.Palette.Name)
+	var seen []string
+	for range mapterm.Palettes {
+		m, _ = press(m, "P")
+		seen = append(seen, m.maps.main.Palette.Name)
+	}
+	if strings.Join(seen, " ") != "amber blue cyan solarized-dark solarized-light green" {
+		t.Errorf("P cycles every palette and wraps: %v", seen)
 	}
 	m, _ = press(m, "L")
 	if m.maps.main.Labels {

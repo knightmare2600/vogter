@@ -77,10 +77,13 @@ const (
 // Palettes, the default first. Every palette gives labels at least 4.5:1
 // contrast and roads and water at least 3:1, the WCAG targets for text and
 // graphics, which a test holds them to; soft textures such as parks may be
-// lower so they stay in the background. Green phosphor is the default look; the other
-// phosphors are kept for later.
+// lower so they stay in the background. Green phosphor is the default look,
+// after Escape from New York; amber, blue and cyan are its siblings.
 var Palettes = []Palette{
 	phosphor("green", "#1f6f2a", "#2fbf45", "#7dff8c", "#c8ffd0"),
+	phosphor("amber", "#7a4a0c", "#c77b14", "#ffb347", "#ffe0b0"),
+	phosphor("blue", "#1a3f7a", "#2f6fd1", "#7fb2ff", "#d2e4ff"),
+	phosphor("cyan", "#12666a", "#1fb3b8", "#6ff3f7", "#cdfcfd"),
 	{
 		Name: "solarized-dark", Background: hex(solBase03), Label: hex(solBase1),
 		Status: [StatusCount]color.Color{hex(solRed), hex(solYellow), hex(solBase1), hex(solGreen)},
@@ -103,20 +106,9 @@ var Palettes = []Palette{
 	},
 }
 
-// ExtraPalettes unlock once the map is known to work: the other phosphors.
-var ExtraPalettes = []Palette{
-	phosphor("amber", "#7a4a0c", "#c77b14", "#ffb347", "#ffe0b0"),
-	phosphor("blue", "#1a3f7a", "#2f6fd1", "#7fb2ff", "#d2e4ff"),
-	phosphor("cyan", "#12666a", "#1fb3b8", "#6ff3f7", "#cdfcfd"),
-}
-
-// PaletteByName finds a palette, among the extras too when allowed.
-func PaletteByName(name string, extras bool) (Palette, bool) {
-	all := Palettes
-	if extras {
-		all = append(append([]Palette{}, Palettes...), ExtraPalettes...)
-	}
-	for _, p := range all {
+// PaletteByName finds a palette, or gives the default.
+func PaletteByName(name string) (Palette, bool) {
+	for _, p := range Palettes {
 		if strings.EqualFold(p.Name, name) {
 			return p, true
 		}

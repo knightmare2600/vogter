@@ -306,7 +306,7 @@ func mapOptions(c config.Map) ui.MapOptions {
 		mapterm.LayerParks:     !config.On(c.ShowParks),
 	}}
 	o.Mode, _ = mapterm.ParseMode(c.RenderMode)
-	o.Palette, _ = mapterm.PaletteByName(c.Palette, false)
+	o.Palette, _ = mapterm.PaletteByName(c.Palette)
 	if c.Latitude != nil && c.Longitude != nil {
 		at := mapterm.LatLon{Lat: *c.Latitude, Lon: *c.Longitude}
 		if at.Valid() && at.Lat >= -mapterm.MaxLat && at.Lat <= mapterm.MaxLat {

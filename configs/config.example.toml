@@ -34,7 +34,7 @@ min_severity = "average"
 # contributors, under the ODbL; tiles © OpenMapTiles.
 enabled = false
 # render_mode = "braille"        # braille, unicode or ascii
-# palette = "green"              # green, solarized-dark, solarized-light
+# palette = "green"              # green, amber, blue, cyan, solarized-dark, solarized-light
 # show_labels = true
 # show_buildings = true
 # show_railways = true

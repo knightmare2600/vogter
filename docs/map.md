@@ -57,7 +57,7 @@ it on for one session, or keep it on in the config:
 [map]
 enabled = true
 render_mode = "braille"        # braille, unicode or ascii; v cycles
-palette = "green"              # green, solarized-dark, solarized-light; P cycles
+palette = "green"              # green, amber, blue, cyan, solarized-dark, solarized-light; P cycles
 show_labels = true
 show_buildings = true
 show_railways = true
@@ -131,7 +131,8 @@ and names the browser would at its zoom. Buildings need the widget's own zoom to
 
 | Palette | Use |
 |---|---|
-| `green` | Green phosphor, the default |
+| `green` | Green phosphor, the default, after Escape from New York |
+| `amber`, `blue`, `cyan` | The same old-monitor look in other phosphors |
 | `solarized-dark`, `solarized-light` | Lower glare, for glaucoma and similar needs |
 
 Every palette is held by a test to the WCAG contrast targets against its own background: 4.5:1 for names, 3:1 for

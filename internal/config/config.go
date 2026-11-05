@@ -61,7 +61,7 @@ func On(b *bool) bool { return b == nil || *b }
 // Map palettes and modes, for validation. The map package owns the real lists.
 var (
 	MapModes    = []string{"braille", "unicode", "ascii"}
-	MapPalettes = []string{"green", "solarized-dark", "solarized-light"}
+	MapPalettes = []string{"green", "amber", "blue", "cyan", "solarized-dark", "solarized-light"}
 )
 
 // Notifications controls toasts and desktop notifications.
